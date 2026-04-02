@@ -23,7 +23,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "node --check common.mjs && node --check session-start.mjs && node --check pre-tool-policy.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs"
+    "check": "node --check common.mjs && node --check session-start.mjs && node --check pre-tool-policy.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs",
+    "doctor": "node doctor.mjs"
   },
   "repository": {
     "type": "git",
