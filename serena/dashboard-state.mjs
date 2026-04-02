@@ -248,28 +248,36 @@ export async function pickMostRecentActiveClient() {
   return candidates[0] ?? null;
 }
 
-export function openExternalUrl(url) {
+export function openExternalUrl(url, { platform = process.platform, runner = spawnSync } = {}) {
   let command = "xdg-open";
   let args = [url];
 
-  if (process.platform === "darwin") {
+  if (platform === "darwin") {
     command = "open";
-  } else if (process.platform === "win32") {
+  } else if (platform === "win32") {
     command = "cmd";
     args = ["/c", "start", "", url];
   }
 
-  const result = spawnSync(command, args, {
+  const result = runner(command, args, {
     stdio: "ignore",
   });
 
   if (result.error) {
-    return result.error;
+    return {
+      ok: false,
+      error: result.error,
+    };
   }
 
   if (typeof result.status === "number" && result.status !== 0) {
-    return new Error(`Failed to open ${url} with ${command}.`);
+    return {
+      ok: false,
+      error: new Error(`Failed to open ${url} with ${command}.`),
+    };
   }
 
-  return null;
+  return {
+    ok: true,
+  };
 }

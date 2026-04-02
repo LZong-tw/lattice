@@ -97,6 +97,9 @@ process.stdout.write(`${clientState.dashboardUrl}\n`);
 
 if (!openResult.ok) {
   console.error(`Serena dashboard is available at ${clientState.dashboardUrl}, but it could not be opened automatically.`);
+  if (openResult.error instanceof Error) {
+    console.error(openResult.error.message);
+  }
   process.exit(1);
 }
 

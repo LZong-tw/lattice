@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   extractDashboardUrl,
   getRuntimeRoot,
+  openExternalUrl,
   pickMostRecentActiveClient,
   readDashboardUrlFile,
 } from "../serena/dashboard-state.mjs";
@@ -95,5 +96,34 @@ describe("Serena dashboard state helpers", () => {
     writeFileSync(urlFile, "  http://127.0.0.1:24283/dashboard/index.html  \n", "utf8");
 
     expect(readDashboardUrlFile(urlFile)).toBe("http://127.0.0.1:24283/dashboard/index.html");
+  });
+
+  it("reports successful browser launches with an ok result", () => {
+    const runner = () => ({
+      status: 0,
+    });
+
+    expect(
+      openExternalUrl("http://127.0.0.1:24283/dashboard/index.html", {
+        platform: "darwin",
+        runner,
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("reports browser launch failures with an error result", () => {
+    const runner = () => ({
+      status: 1,
+    });
+
+    expect(
+      openExternalUrl("http://127.0.0.1:24283/dashboard/index.html", {
+        platform: "linux",
+        runner,
+      }),
+    ).toEqual({
+      ok: false,
+      error: expect.any(Error),
+    });
   });
 });
