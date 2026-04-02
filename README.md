@@ -423,6 +423,12 @@ The current provider is [Serena](https://github.com/oraios/serena). See
 [`docs/SERENA-CLIENT-SETUP.md`](docs/SERENA-CLIENT-SETUP.md) for full
 provider setup with per-client endpoints, smoke tests, and troubleshooting.
 
+If you are adding another provider (for example `mcp-local-rag`) and need it to
+flow cleanly into consumer repos, use
+[`docs/PROVIDER-ROLLOUT.md`](docs/PROVIDER-ROLLOUT.md). That doc covers the full
+chain from provider code in `lattice` to submodule upgrades, consumer config,
+and rollout validation.
+
 **Serena is not required.** The shared hooks work without it.
 
 To add a different provider, create a provider subdirectory with a
