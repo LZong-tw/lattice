@@ -1,0 +1,37 @@
+{
+  "name": "lattice",
+  "version": "0.1.0",
+  "description": "General-purpose AI-client hook layer — repo-scoped guardrails and lifecycle hooks for Claude Code, GitHub Copilot CLI, and Codex CLI",
+  "type": "module",
+  "exports": {
+    "./common": "./common.mjs",
+    "./session-start": "./session-start.mjs",
+    "./pre-tool-policy": "./pre-tool-policy.mjs",
+    "./commit-checkpoint": "./commit-checkpoint.mjs",
+    "./post-tool-reminder": "./post-tool-reminder.mjs",
+    "./stop-checklist": "./stop-checklist.mjs",
+    "./serena/bootstrap": "./serena/bootstrap.mjs",
+    "./serena/dashboard-state": "./serena/dashboard-state.mjs",
+    "./serena/start-http": "./serena/start-http.mjs",
+    "./serena/open-dashboard": "./serena/open-dashboard.mjs"
+  },
+  "files": [
+    "*.mjs",
+    "serena/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "node --check common.mjs && node --check session-start.mjs && node --check pre-tool-policy.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@git.example.com/LZong/lattice.git"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.0"
+  }
+}
