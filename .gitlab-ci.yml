@@ -9,6 +9,8 @@ Test lattice:
   stage: test
   tags:
     - ci-runner
+  before_script:
+    - apk add --no-cache git
   script:
     - corepack enable
     - pnpm install --frozen-lockfile

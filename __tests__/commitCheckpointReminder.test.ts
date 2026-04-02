@@ -16,6 +16,10 @@ function initGitRepo(root: string) {
     encoding: "utf8",
   });
 
+  if (result.error) {
+    throw new Error(`git init could not run: ${result.error.message}`);
+  }
+
   if (result.status !== 0) {
     throw new Error(result.stderr || result.stdout || "git init failed");
   }
