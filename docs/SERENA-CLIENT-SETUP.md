@@ -213,7 +213,22 @@ node hooks/serena/open-dashboard.mjs          # auto-detect most recent client
 node hooks/serena/open-dashboard.mjs claude    # specific client
 node hooks/serena/open-dashboard.mjs copilot
 node hooks/serena/open-dashboard.mjs codex
+node hooks/serena/open-dashboard.mjs --browser # force browser open (Windows override)
 ```
+
+**Platform behavior:**
+
+| Platform | Default behavior |
+|----------|-----------------|
+| **Windows** | Serena ships a native tray icon that manages the dashboard window. The helper prints the dashboard URL and instructs you to use Serena's system-tray icon to show the window. It does **not** auto-open a browser. Pass `--browser` to open the raw URL in a browser instead. |
+| **macOS** | Opens the dashboard URL in the default browser. Note: Serena's native macOS tray/icon support is **currently disabled upstream** (commented out in Serena source due to tray icon issues), so there is no native tray window to reopen on macOS. |
+| **Linux** | Opens the dashboard URL in the default browser. |
+
+> **Note on `OpenDashboardTool` (upstream):** Serena's built-in `OpenDashboardTool`
+> opens the default browser on all platforms. It does not reopen a native tray
+> window. lattice's helper aligns with this: on Windows it defers to the tray
+> icon (which Serena itself controls) rather than silently opening a second
+> browser tab.
 
 If the requested client is not running, the helper attempts to start the
 matching launcher first.
@@ -316,6 +331,7 @@ brew install python@3.12   # macOS
 ```bash
 pnpm test       # vitest test suite (from lattice root)
 pnpm run check  # node --check on all entry points
+pnpm run doctor # lightweight package health check
 ```
 
 ---

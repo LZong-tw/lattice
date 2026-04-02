@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -9,6 +9,13 @@ import { buildCommitCheckpointReminder } from "../commit-checkpoint.mjs";
 
 let tempRepo: string | null = null;
 let tempStateHome: string | null = null;
+const testRoot = resolve(process.cwd(), ".test-state", "commitCheckpointReminder");
+
+function createTestDir(prefix: string) {
+  const dir = resolve(testRoot, `${prefix}-${process.pid}-${randomUUID()}`);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
 
 function initGitRepo(root: string) {
   const result = spawnSync("git", ["init"], {
@@ -35,12 +42,14 @@ afterEach(() => {
     rmSync(tempStateHome, { recursive: true, force: true });
     tempStateHome = null;
   }
+
+  rmSync(testRoot, { recursive: true, force: true });
 });
 
 describe("commit checkpoint reminder", () => {
   it("ignores the repo-local .serena runtime state", () => {
-    tempRepo = mkdtempSync(resolve(tmpdir(), "lattice-commit-reminder-"));
-    tempStateHome = mkdtempSync(resolve(tmpdir(), "lattice-commit-reminder-state-"));
+    tempRepo = createTestDir("repo");
+    tempStateHome = createTestDir("state");
 
     initGitRepo(tempRepo);
     mkdirSync(resolve(tempRepo, ".serena"), { recursive: true });
@@ -56,8 +65,8 @@ describe("commit checkpoint reminder", () => {
   });
 
   it("returns a checkpoint reminder for a real dirty tree and suppresses repeats", () => {
-    tempRepo = mkdtempSync(resolve(tmpdir(), "lattice-commit-reminder-"));
-    tempStateHome = mkdtempSync(resolve(tmpdir(), "lattice-commit-reminder-state-"));
+    tempRepo = createTestDir("repo");
+    tempStateHome = createTestDir("state");
 
     initGitRepo(tempRepo);
     writeFileSync(resolve(tempRepo, "notes.txt"), "keep me", "utf8");

@@ -192,7 +192,9 @@ describe("Serena provider contracts", () => {
   it("dashboard helper imports the shared dashboard-state module", () => {
     const source = readFileSync(resolve(packageRoot, "serena/open-dashboard.mjs"), "utf8");
     expect(source).toContain("dashboard-state.mjs");
+    expect(source).toContain("getDashboardOpenPlan");
     expect(source).toContain("pickMostRecentActiveClient");
     expect(source).toContain("openExternalUrl");
+    expect(source).toContain("--browser");
   });
 });

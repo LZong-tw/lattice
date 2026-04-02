@@ -248,6 +248,37 @@ export async function pickMostRecentActiveClient() {
   return candidates[0] ?? null;
 }
 
+/**
+ * Returns the dashboard-open strategy for the given platform.
+ *
+ * - "tray"    (win32)  — Serena ships a native tray icon on Windows. Print the
+ *                        URL and instruct the user to use Serena's tray icon to
+ *                        show the window. Do NOT auto-open a browser by default.
+ * - "browser" (darwin) — Serena's macOS native tray support is currently
+ *                        disabled upstream (icon issues); fall back to browser.
+ * - "browser" (linux)  — Serena uses browser-based dashboard on Linux.
+ *
+ * @param {string} [platform] - Node.js process.platform value (default: current platform)
+ * @returns {"tray" | "browser"}
+ */
+export function getDashboardPlatformStrategy(platform = process.platform) {
+  return platform === "win32" ? "tray" : "browser";
+}
+
+/**
+ * Returns the effective dashboard-open plan for the given platform.
+ *
+ * @param {{ platform?: string, forceBrowser?: boolean }} [options]
+ * @returns {{ strategy: "tray" | "browser", openInBrowser: boolean }}
+ */
+export function getDashboardOpenPlan({ platform = process.platform, forceBrowser = false } = {}) {
+  const strategy = getDashboardPlatformStrategy(platform);
+  return {
+    strategy,
+    openInBrowser: strategy === "browser" || forceBrowser,
+  };
+}
+
 export function openExternalUrl(url, { platform = process.platform, runner = spawnSync } = {}) {
   let command = "xdg-open";
   let args = [url];

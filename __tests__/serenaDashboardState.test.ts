@@ -1,11 +1,13 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  getDashboardOpenPlan,
   extractDashboardUrl,
+  getDashboardPlatformStrategy,
   getRuntimeRoot,
   openExternalUrl,
   pickMostRecentActiveClient,
@@ -13,13 +15,22 @@ import {
 } from "../serena/dashboard-state.mjs";
 
 const originalStateHome = process.env.XDG_STATE_HOME;
+const testStateRoot = resolve(process.cwd(), ".test-state", "serenaDashboardState");
 let tempStateHome: string | null = null;
+
+function createStateHome(prefix: string) {
+  const stateHome = resolve(testStateRoot, `${prefix}-${process.pid}-${randomUUID()}`);
+  mkdirSync(stateHome, { recursive: true });
+  return stateHome;
+}
 
 afterEach(() => {
   if (tempStateHome) {
     rmSync(tempStateHome, { recursive: true, force: true });
     tempStateHome = null;
   }
+
+  rmSync(testStateRoot, { recursive: true, force: true });
 
   process.env.XDG_STATE_HOME = originalStateHome;
 });
@@ -40,7 +51,7 @@ describe("Serena dashboard state helpers", () => {
   });
 
   it("prefers the newest active Serena dashboard", async () => {
-    tempStateHome = mkdtempSync(resolve(tmpdir(), "lattice-serena-state-"));
+    tempStateHome = createStateHome("state");
     process.env.XDG_STATE_HOME = tempStateHome;
 
     const runtimeRoot = getRuntimeRoot();
@@ -86,7 +97,7 @@ describe("Serena dashboard state helpers", () => {
   });
 
   it("reads persisted dashboard URLs from the .url file", () => {
-    tempStateHome = mkdtempSync(resolve(tmpdir(), "lattice-serena-url-"));
+    tempStateHome = createStateHome("url");
     process.env.XDG_STATE_HOME = tempStateHome;
 
     const runtimeRoot = getRuntimeRoot();
@@ -111,6 +122,25 @@ describe("Serena dashboard state helpers", () => {
     ).toEqual({ ok: true });
   });
 
+  it("uses the expected browser opener for each supported platform", () => {
+    const dashboardUrl = "http://127.0.0.1:24283/dashboard/index.html";
+    const calls: Array<{ command: string; args: string[] }> = [];
+    const runner = (command: string, args: string[]) => {
+      calls.push({ command, args });
+      return { status: 0 };
+    };
+
+    expect(openExternalUrl(dashboardUrl, { platform: "darwin", runner })).toEqual({ ok: true });
+    expect(openExternalUrl(dashboardUrl, { platform: "linux", runner })).toEqual({ ok: true });
+    expect(openExternalUrl(dashboardUrl, { platform: "win32", runner })).toEqual({ ok: true });
+
+    expect(calls).toEqual([
+      { command: "open", args: [dashboardUrl] },
+      { command: "xdg-open", args: [dashboardUrl] },
+      { command: "cmd", args: ["/c", "start", "", dashboardUrl] },
+    ]);
+  });
+
   it("reports browser launch failures with an error result", () => {
     const runner = () => ({
       status: 1,
@@ -124,6 +154,51 @@ describe("Serena dashboard state helpers", () => {
     ).toEqual({
       ok: false,
       error: expect.any(Error),
+    });
+  });
+});
+
+describe("getDashboardPlatformStrategy", () => {
+  it("returns 'tray' on Windows", () => {
+    expect(getDashboardPlatformStrategy("win32")).toBe("tray");
+  });
+
+  it("returns 'browser' on macOS (native tray disabled upstream)", () => {
+    expect(getDashboardPlatformStrategy("darwin")).toBe("browser");
+  });
+
+  it("returns 'browser' on Linux", () => {
+    expect(getDashboardPlatformStrategy("linux")).toBe("browser");
+  });
+
+  it("returns 'browser' for unknown platforms", () => {
+    expect(getDashboardPlatformStrategy("freebsd")).toBe("browser");
+  });
+});
+
+describe("getDashboardOpenPlan", () => {
+  it("keeps Windows on the tray workflow by default", () => {
+    expect(getDashboardOpenPlan({ platform: "win32" })).toEqual({
+      strategy: "tray",
+      openInBrowser: false,
+    });
+  });
+
+  it("lets Windows users opt into the browser explicitly", () => {
+    expect(getDashboardOpenPlan({ platform: "win32", forceBrowser: true })).toEqual({
+      strategy: "tray",
+      openInBrowser: true,
+    });
+  });
+
+  it("opens in the browser by default on macOS and Linux", () => {
+    expect(getDashboardOpenPlan({ platform: "darwin" })).toEqual({
+      strategy: "browser",
+      openInBrowser: true,
+    });
+    expect(getDashboardOpenPlan({ platform: "linux" })).toEqual({
+      strategy: "browser",
+      openInBrowser: true,
     });
   });
 });

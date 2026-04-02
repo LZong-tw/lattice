@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 
 import path from "node:path";
 import {
+  getDashboardOpenPlan,
   getClientPaths,
   isPortListening,
   isProcessAlive,
@@ -18,18 +19,45 @@ import {
 function printUsage() {
   console.error(
     [
-      "Usage: node hooks/serena/open-dashboard.mjs [copilot|claude|codex]",
-      "If no client is provided, the newest active Serena dashboard is opened.",
-      "The helper prints the dashboard URL to stdout and opens it in the default browser when possible.",
+      "Usage: node hooks/serena/open-dashboard.mjs [options] [copilot|claude|codex]",
+      "",
+      "Options:",
+      "  --browser   Force opening the dashboard URL in the default browser.",
+      "              On macOS and Linux this is the default. On Windows, Serena",
+      "              ships a native tray icon; this flag bypasses it.",
+      "  -h, --help  Show this help message.",
+      "",
+      "If no client is provided, the newest active Serena dashboard is used.",
+      "",
+      "Platform behavior:",
+      "  Windows  — Prints the dashboard URL and instructs you to use Serena's",
+      "             tray icon to show the window. Pass --browser to open the URL",
+      "             directly in a browser instead.",
+      "  macOS    — Opens the dashboard in the default browser. (Serena's native",
+      "             macOS tray support is currently disabled upstream.)",
+      "  Linux    — Opens the dashboard in the default browser.",
     ].join("\n"),
   );
 }
 
-const requestedClient = process.argv[2];
+// Parse flags from argv, separating known options from the positional client arg.
+const rawArgs = process.argv.slice(2);
+let forceBrowser = false;
+let requestedClient = null;
 
-if (requestedClient === "-h" || requestedClient === "--help") {
-  printUsage();
-  process.exit(0);
+for (const arg of rawArgs) {
+  if (arg === "-h" || arg === "--help") {
+    printUsage();
+    process.exit(0);
+  } else if (arg === "--browser") {
+    forceBrowser = true;
+  } else if (!requestedClient) {
+    requestedClient = arg;
+  } else {
+    console.error(`Unexpected argument: ${arg}`);
+    printUsage();
+    process.exit(1);
+  }
 }
 
 const normalizedRequestedClient = normalizeSerenaClient(requestedClient);
@@ -92,6 +120,21 @@ if (!clientState?.dashboardUrl) {
   process.exit(1);
 }
 
+const openPlan = getDashboardOpenPlan({ forceBrowser });
+
+if (!openPlan.openInBrowser) {
+  // Windows: Serena manages its own native tray window. We cannot reopen it
+  // from outside the Serena process. Print the URL and guide the user.
+  process.stdout.write(`${clientState.dashboardUrl}\n`);
+  console.error(
+    `Serena ${clientState.client} dashboard is running at the URL above.\n` +
+    `On Windows, use the Serena tray icon in the system tray to show the window.\n` +
+    `To open the URL in a browser instead, re-run with --browser.`,
+  );
+  process.exit(0);
+}
+
+// macOS, Linux, or Windows with --browser: open in the default browser.
 const openResult = openExternalUrl(clientState.dashboardUrl);
 process.stdout.write(`${clientState.dashboardUrl}\n`);
 
