@@ -6,6 +6,7 @@
   "exports": {
     "./common": "./common.mjs",
     "./session-start": "./session-start.mjs",
+    "./provider-registry": "./provider-registry.mjs",
     "./pre-tool-policy": "./pre-tool-policy.mjs",
     "./commit-checkpoint": "./commit-checkpoint.mjs",
     "./post-tool-reminder": "./post-tool-reminder.mjs",
@@ -23,7 +24,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "node --check common.mjs && node --check session-start.mjs && node --check pre-tool-policy.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs",
+    "check": "node --check common.mjs && node --check session-start.mjs && node --check provider-registry.mjs && node --check pre-tool-policy.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs",
     "doctor": "node doctor.mjs"
   },
   "repository": {

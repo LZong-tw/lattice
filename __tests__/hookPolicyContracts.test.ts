@@ -128,8 +128,16 @@ describe("Serena provider contracts", () => {
     },
   );
 
-  it("session-start delegates provider bootstrap to serena/bootstrap.mjs", () => {
+  it("session-start delegates provider bootstrap to provider-registry.mjs", () => {
     const source = readFileSync(resolve(packageRoot, "session-start.mjs"), "utf8");
+    expect(source).toContain("./provider-registry.mjs");
+    expect(source).toContain("bootstrapProviders");
+  });
+
+  it("provider-registry.mjs wires Serena as the default provider", () => {
+    const source = readFileSync(resolve(packageRoot, "provider-registry.mjs"), "utf8");
+    expect(source).toContain("LATTICE_PROVIDER");
+    expect(source).toContain("LATTICE_PROVIDERS");
     expect(source).toContain("./serena/bootstrap.mjs");
     expect(source).toContain("bootstrapSerena");
   });

@@ -13,6 +13,60 @@
 
 ---
 
+## Provider Registry Contract
+
+Provider selection is managed by `provider-registry.mjs` at the package root.
+`session-start.mjs` delegates to `bootstrapProviders(client)` from that module.
+
+### Environment variables
+
+| Variable | Behaviour |
+|----------|-----------|
+| _(none set)_ | Default: activates `["serena"]`. Existing behaviour preserved. |
+| `LATTICE_PROVIDER=<name>` | Activate a single named provider. |
+| `LATTICE_PROVIDERS=<name1>,<name2>` | Activate an ordered list of providers. **Takes precedence over `LATTICE_PROVIDER`.** |
+| `LATTICE_PROVIDER=none` (or `off` / `false` / `0`) | Disable all providers. |
+| `LATTICE_PROVIDERS=none` | Disable all providers. |
+
+Rules:
+- **Default selection stays backward-compatible.** Serena activates by default. If
+  `serena/bootstrap.mjs` is absent or fails to import, the session hook still exits
+  0 — matching the historical fallback in `session-start.mjs`.
+- **Explicit selections fail fast.** If `LATTICE_PROVIDER` or `LATTICE_PROVIDERS` names
+  an unknown provider, the hook exits 1 with a clear error message.
+- Provider names are case-insensitive. Duplicate names are collapsed while preserving
+  the first occurrence.
+- Disable tokens (`none`, `off`, `false`, `0`) are case-insensitive. A list made up
+  entirely of disable tokens resolves to `[]`; mixed lists keep the real providers.
+- Selected providers run in the order listed and stop on the first non-zero exit code.
+
+### Adding a new provider (copy-paste ready)
+
+1. Create `<provider-name>/bootstrap.mjs` with a named export matching the pattern.
+2. Register it in `providerRegistry` inside `provider-registry.mjs`:
+
+```js
+"mcp-local-rag": {
+  name: "mcp-local-rag",
+  async bootstrap(client) {
+    const { bootstrapMcpLocalRag } = await import("./mcp-local-rag/bootstrap.mjs");
+    return bootstrapMcpLocalRag(client);
+  },
+},
+```
+
+3. Expose it in `package.json` exports:
+
+```json
+"./mcp-local-rag/bootstrap": "./mcp-local-rag/bootstrap.mjs"
+```
+
+4. Add `mcp-local-rag/bootstrap.mjs` to the `entryPoints` array in `doctor.mjs`
+   and to the `check` script in `package.json`.
+5. Run `pnpm run doctor && pnpm test && pnpm run check` before committing.
+
+---
+
 ## What This Document Solves
 
 The general hook layer and the provider layer live in different places:

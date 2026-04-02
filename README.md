@@ -5,7 +5,10 @@ policy gates, lifecycle reminders, and provider integrations for
 **Claude Code**, **GitHub Copilot CLI**, and **Codex CLI**.
 
 This repo is designed to be mounted into a consuming repo at the stable path
-`hooks/`. The shared layer works without any provider; Serena is optional.
+`hooks/`. The shared hook logic stays provider-agnostic. `session-start.mjs`
+now selects providers through an explicit registry contract: Serena remains the
+default, and you can override or disable provider bootstrap with environment
+variables.
 
 ---
 
@@ -81,6 +84,7 @@ START
 | Layer | Location | Purpose |
 |-------|----------|---------|
 | Shared runtime | `*.mjs` | Client-agnostic hook entry points and policy logic |
+| Provider registry | `provider-registry.mjs` | Explicit provider selection and bootstrap contract |
 | Provider integration | `serena/` | Serena-specific lifecycle, launcher, and dashboard helpers |
 | Tests | `__tests__/` | Package-level runtime and provider contracts |
 | Docs | `docs/` | Provider details and consumer guidance |
@@ -215,7 +219,7 @@ and a smoke test.
 **Smoke test:**
 
 ```bash
-echo '{}' | node hooks/session-start.mjs claude; echo "exit: $?"
+printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude; echo "exit: $?"
 # => exit: 0
 
 echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs claude
@@ -263,7 +267,7 @@ environment actually uses; there is no single repo-scoped Copilot MCP file that
 **Smoke test:**
 
 ```bash
-echo '{}' | node hooks/session-start.mjs copilot; echo "exit: $?"
+printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs copilot; echo "exit: $?"
 # => exit: 0
 
 echo '{"toolName":"bash","toolArgs":"{\"command\":\"git commit -m test\"}"}' | node hooks/pre-tool-policy.mjs copilot
@@ -322,7 +326,7 @@ codex_hooks = true
 **Smoke test:**
 
 ```bash
-echo '{}' | node hooks/session-start.mjs codex; echo "exit: $?"
+printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs codex; echo "exit: $?"
 # => exit: 0
 
 echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs codex
@@ -333,13 +337,19 @@ echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node
 
 ### Step 4 — Serena (Optional)
 
-The shared hooks work standalone. Serena adds MCP server lifecycle and a
-dashboard. If you want it:
+The default `session-start.mjs` provider selection is Serena. Serena adds MCP
+server lifecycle and a dashboard. If you want it:
 
 → Follow [`docs/SERENA-CLIENT-SETUP.md`](docs/SERENA-CLIENT-SETUP.md)
 
-If you skip Serena, `session-start.mjs` silently skips the provider bootstrap
-and exits 0. No additional configuration is needed.
+If you want the shared hooks without any provider bootstrap, explicitly disable
+providers in the environment that invokes `session-start.mjs`:
+
+- `LATTICE_PROVIDER=none`
+- `LATTICE_PROVIDERS=none`
+
+If you add another provider later, `LATTICE_PROVIDERS=<name1>,<name2>` selects
+an ordered list and takes precedence over `LATTICE_PROVIDER=<name>`.
 
 ---
 
@@ -350,7 +360,7 @@ An LLM agent can consider consumer setup **complete** when ALL of these pass:
 1. `ls hooks/common.mjs` → file exists
 2. `node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/pre-tool-policy.mjs` → exits 0
 3. The client config file exists at the correct path (see per-client sections above)
-4. `echo '{}' | node hooks/session-start.mjs <client>` → exits 0
+4. `printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs <client>` → exits 0
 5. The commit-gate smoke test returns `"permissionDecision":"deny"` for `git commit`
 6. (If Serena) `curl -sf http://127.0.0.1:<port>/mcp` responds (see SERENA-CLIENT-SETUP.md)
 
@@ -383,6 +393,7 @@ pnpm run doctor
 # ✓ Node.js >= 18
 # ✓ common.mjs parses
 # ✓ session-start.mjs parses
+# ✓ provider-registry.mjs parses
 # ✓ pre-tool-policy.mjs parses
 # ✓ commit-checkpoint.mjs parses
 # ✓ post-tool-reminder.mjs parses
@@ -419,7 +430,19 @@ You can override detection when needed:
 
 ## Provider Integration
 
-The current provider is [Serena](https://github.com/oraios/serena). See
+Provider bootstrap is selected through `provider-registry.mjs` with this
+contract:
+
+| Variable | Behaviour |
+|----------|-----------|
+| _(none set)_ | Default to `serena` |
+| `LATTICE_PROVIDER=<name>` | Select one provider |
+| `LATTICE_PROVIDERS=<name1>,<name2>` | Select an ordered list; takes precedence |
+| `LATTICE_PROVIDER=none` / `LATTICE_PROVIDERS=none` | Disable all providers |
+
+Explicit provider names are validated. Unknown names fail fast with exit code 1.
+
+The current real provider is [Serena](https://github.com/oraios/serena). See
 [`docs/SERENA-CLIENT-SETUP.md`](docs/SERENA-CLIENT-SETUP.md) for full
 provider setup with per-client endpoints, smoke tests, and troubleshooting.
 
@@ -429,10 +452,8 @@ flow cleanly into consumer repos, use
 chain from provider code in `lattice` to submodule upgrades, consumer config,
 and rollout validation.
 
-**Serena is not required.** The shared hooks work without it.
-
 To add a different provider, create a provider subdirectory with a
-`bootstrap.mjs` entry point that `session-start.mjs` can delegate to.
+`bootstrap.mjs` entry point and register it in `provider-registry.mjs`.
 
 ---
 
@@ -457,6 +478,7 @@ Tests cover:
 - Consumer path contract stability
 - Commit checkpoint reminder behavior
 - Hook policy entry-point behavior (commit gate deny for all clients)
+- Provider registry selection and bootstrap contract
 - Serena runtime state helpers and launcher contracts
 
 ---
@@ -477,13 +499,16 @@ git submodule update --init --recursive
 
 ### `session-start.mjs` exits non-zero
 
-**Cause:** Serena bootstrap failed (provider issue, not a shared-hook issue).
+**Cause:** explicit provider selection is invalid, or a provider bootstrap
+returned a non-zero exit code.
 
 ```bash
-# Test without Serena:
-echo '{}' | node hooks/session-start.mjs claude
-# => Should exit 0. If it does, the issue is Serena-specific.
-# => Follow docs/SERENA-CLIENT-SETUP.md troubleshooting.
+# Isolate the shared hook layer by disabling all providers:
+printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude
+# => Should exit 0. If it does, the failure is provider-specific.
+
+# Then validate the selected provider config/env.
+# For Serena, follow docs/SERENA-CLIENT-SETUP.md troubleshooting.
 ```
 
 ### Commit gate does not fire (no deny on `git commit`)

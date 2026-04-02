@@ -47,6 +47,7 @@ if (major >= 18) {
 const entryPoints = [
   "common.mjs",
   "session-start.mjs",
+  "provider-registry.mjs",
   "pre-tool-policy.mjs",
   "commit-checkpoint.mjs",
   "post-tool-reminder.mjs",

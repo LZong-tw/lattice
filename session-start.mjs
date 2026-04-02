@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 import { readJsonStdin } from "./common.mjs";
 import { maybePrintCommitCheckpointReminder } from "./commit-checkpoint.mjs";
+import { bootstrapProviders } from "./provider-registry.mjs";
 
 await readJsonStdin();
 maybePrintCommitCheckpointReminder();
 
 const client = process.argv[2];
 
-// Serena integration is optional and lives in serena/bootstrap.mjs.
-// If the module is missing or the client is unrecognised, skip silently.
+// Provider selection is driven by provider-registry.mjs.
+// Unknown explicit providers fail fast; the default Serena selection preserves
+// the historical fallback when serena/bootstrap.mjs is absent.
 try {
-  const { bootstrapSerena } = await import("./serena/bootstrap.mjs");
-  process.exit(bootstrapSerena(client));
-} catch {
-  process.exit(0);
+  process.exit(await bootstrapProviders(client));
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`lattice: provider bootstrap error: ${message}\n`);
+  process.exit(1);
 }
