@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { getStateNamespace, repoRoot } from "../common.mjs";
+
 const __filename = fileURLToPath(import.meta.url);
 const serenaDir = path.dirname(__filename);
 
@@ -49,7 +51,7 @@ export function getStateRoot() {
 }
 
 export function getRuntimeRoot() {
-  return path.join(getStateRoot(), "lattice", "serena");
+  return path.join(getStateRoot(), getStateNamespace(repoRoot), "serena");
 }
 
 export function normalizeSerenaClient(client) {
@@ -259,12 +261,15 @@ export function openExternalUrl(url) {
 
   const result = spawnSync(command, args, {
     stdio: "ignore",
-    windowsHide: true,
   });
 
-  return {
-    command,
-    ok: !result.error && (result.status === 0 || result.status === null),
-    result,
-  };
+  if (result.error) {
+    return result.error;
+  }
+
+  if (typeof result.status === "number" && result.status !== 0) {
+    return new Error(`Failed to open ${url} with ${command}.`);
+  }
+
+  return null;
 }

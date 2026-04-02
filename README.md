@@ -1,66 +1,60 @@
 # lattice
 
-General-purpose AI-client hook layer — repo-scoped guardrails and lifecycle hooks
-for **Claude Code**, **GitHub Copilot CLI**, and **Codex CLI**.
+`lattice` is a repo-scoped AI client runtime layer: shared hook entry points,
+policy gates, lifecycle reminders, and provider integrations for
+**Claude Code**, **GitHub Copilot CLI**, and **Codex CLI**.
 
-## Overview
+This repo is designed to be mounted into a consuming repo at a stable path such
+as `hooks/`.
 
-This package provides a consistent, provider-agnostic hook layer that gives
-three AI coding clients repo-scoped guardrails and lifecycle hooks. It is
-designed to be **independently consumable** — either as a pnpm workspace
-package, a git submodule, or a standalone directory copy.
-
-### Structure
+## Layout
 
 | Layer | Location | Purpose |
 |-------|----------|---------|
-| **General-purpose hooks** | `*.mjs` (package root) | Client-agnostic policy logic shared by all three clients |
-| **Provider integration** | `serena/` | Serena-specific lifecycle, launcher, and dashboard scripts |
+| Shared runtime | `*.mjs` | Client-agnostic hook entry points and policy logic |
+| Provider integration | `serena/` | Serena-specific lifecycle, launcher, and dashboard helpers |
+| Tests | `__tests__/` | Package-level runtime and provider contracts |
+| Docs | `docs/` | Provider details and consumer guidance |
 
-### Hook scripts
+## Consumer path contract
 
-| Script | Behavior |
-|--------|----------|
-| `session-start.mjs` | Session bootstrap; delegates to provider bootstrap if present |
-| `pre-tool-policy.mjs` | Blocks `git commit` via tool-use denial; surfaces commit-checkpoint reminders |
-| `commit-checkpoint.mjs` | Dirty-tree detection and checkpoint reminder logic |
-| `post-tool-reminder.mjs` | Post-tool-use reminders (screenshot review, edit lessons) |
-| `stop-checklist.mjs` | End-of-turn checklist |
-| `common.mjs` | Shared utilities used by all hooks |
+Inside this repo, scripts live at the package root:
 
-## Zero dependencies
+- `session-start.mjs`
+- `pre-tool-policy.mjs`
+- `commit-checkpoint.mjs`
+- `post-tool-reminder.mjs`
+- `stop-checklist.mjs`
+- `serena/bootstrap.mjs`
 
-The hook layer has **no npm dependencies**. It requires only Node.js (≥ 18)
-and standard shell utilities. This makes it trivially embeddable.
+When mounted inside a consumer repo at `hooks/`, clients execute those same
+files through consumer-facing paths like:
 
-## Adopting in another repo
+- `hooks/session-start.mjs`
+- `hooks/pre-tool-policy.mjs`
+- `hooks/serena/open-dashboard.mjs`
 
-### Option A: Git submodule
+Keeping that `hooks/` mount path stable is the main compatibility contract.
+
+## Recommended consumption
+
+### Git submodule
 
 ```bash
 git submodule add <repo-url> hooks
-# Then wire per-client configs to point at hooks/*.mjs
+git submodule update --init --recursive
 ```
 
-### Option B: Directory copy
+### Directory copy
 
 ```bash
-cp -R hooks/ <your-repo>/hooks/
+cp -R lattice/ <your-repo>/hooks/
 ```
 
-### Option C: pnpm workspace dependency
+If you copy instead of using a submodule, keep the destination path as `hooks/`
+so existing config commands remain valid.
 
-If your project is already a pnpm workspace:
-
-```yaml
-# pnpm-workspace.yaml
-packages:
-  - hooks
-```
-
-### Wiring per-client configs
-
-After placing the hooks directory, wire each AI client:
+## Wiring per client
 
 | Client | Config file | Example entry |
 |--------|-------------|---------------|
@@ -68,32 +62,38 @@ After placing the hooks directory, wire each AI client:
 | GitHub Copilot CLI | `.github/hooks/repo-guardrails.json` | `node ./hooks/session-start.mjs copilot` |
 | Codex CLI | `.codex/hooks.json` | `node "$(git rev-parse --show-toplevel)/hooks/session-start.mjs" codex` |
 
+## State and consumer-root detection
+
+`lattice` auto-detects the consuming repo root when it is mounted at `hooks/`.
+That repo name becomes the default runtime-state namespace under
+`$XDG_STATE_HOME/<repo-name>/...`.
+
+You can override detection when needed:
+
+- `LATTICE_REPO_ROOT`
+- `LATTICE_STATE_NAMESPACE`
+
 ## Provider integration
 
-The `session-start.mjs` hook delegates to a **provider bootstrap** script if
-one exists under a provider subdirectory (e.g., `serena/bootstrap.mjs`).
+The current provider is [Serena](https://github.com/oraios/serena). See
+[`docs/SERENA-CLIENT-SETUP.md`](docs/SERENA-CLIENT-SETUP.md) for provider
+details and dashboard behavior.
 
-The current provider is [Serena](https://github.com/oraios/serena).
-
-To add a different provider, create a directory under `<provider>/` with a
-`bootstrap.mjs` that `session-start.mjs` can delegate to.
+To add a different provider, create a provider subdirectory with a
+`bootstrap.mjs` entry point that `session-start.mjs` can delegate to.
 
 ## Validation
 
 ```bash
-# Syntax-check all hook scripts
-pnpm run check
-
-# Run tests
+pnpm install --frozen-lockfile
 pnpm test
+pnpm run check
 ```
 
 ## Tests
 
-Tests live in `__tests__/` and cover:
+Tests cover:
 
-- Commit checkpoint reminder logic
-- Serena dashboard state helpers
-
-Repo-integration tests (verifying that consumer config files wire through the
-shared scripts) belong in the consuming repository, not here.
+- Commit checkpoint reminder behavior
+- Hook policy entry-point behavior
+- Serena runtime state helpers

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   extractDashboardUrl,
+  getRuntimeRoot,
   pickMostRecentActiveClient,
   readDashboardUrlFile,
 } from "../serena/dashboard-state.mjs";
@@ -41,7 +42,7 @@ describe("Serena dashboard state helpers", () => {
     tempStateHome = mkdtempSync(resolve(tmpdir(), "lattice-serena-state-"));
     process.env.XDG_STATE_HOME = tempStateHome;
 
-    const runtimeRoot = resolve(tempStateHome, "lattice", "serena");
+    const runtimeRoot = getRuntimeRoot();
     mkdirSync(runtimeRoot, { recursive: true });
 
     const clientRows = [
@@ -87,7 +88,7 @@ describe("Serena dashboard state helpers", () => {
     tempStateHome = mkdtempSync(resolve(tmpdir(), "lattice-serena-url-"));
     process.env.XDG_STATE_HOME = tempStateHome;
 
-    const runtimeRoot = resolve(tempStateHome, "lattice", "serena");
+    const runtimeRoot = getRuntimeRoot();
     mkdirSync(runtimeRoot, { recursive: true });
 
     const urlFile = resolve(runtimeRoot, "claude.url");

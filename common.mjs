@@ -5,14 +5,28 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const repoRoot = path.resolve(__dirname, "..");
+function resolveRepoRoot() {
+  const override = process.env.LATTICE_REPO_ROOT?.trim();
+  if (override) {
+    return path.resolve(override);
+  }
+
+  return path.basename(__dirname) === "hooks" ? path.resolve(__dirname, "..") : __dirname;
+}
+
 export const hooksRoot = __dirname;
+export const repoRoot = resolveRepoRoot();
+
+export function getStateNamespace(root = repoRoot) {
+  const override = process.env.LATTICE_STATE_NAMESPACE?.trim();
+  return override || path.basename(root);
+}
 
 export const messages = {
   commitGate: [
     "🚫 PRE-COMMIT GATE",
     "───────────────────────",
-    " 1. Lessons written to CLAUDE.md + MEMORY.md?",
+    " 1. Lessons written to your project guidance + memory docs?",
     " 2. Full visual check (screenshot + scroll ALL areas)?",
     " 3. You-See-It-You-Own-It defects addressed?",
     "───────────────────────",
@@ -25,7 +39,7 @@ export const messages = {
   stopChecklist: [
     "📋 END-OF-TURN CHECKLIST",
     "───────────────────────",
-    " 1. New lesson learned? → Write to CLAUDE.md + MEMORY.md",
+    " 1. New lesson learned? → Write to your project guidance + memory docs",
     " 2. Saw a defect you skipped? → You See It, You Own It",
     " 3. Made UI changes? → Screenshot + scroll ALL areas",
     "───────────────────────",

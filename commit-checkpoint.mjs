@@ -6,21 +6,30 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { printMessage, readJsonStdin, repoRoot as defaultRepoRoot } from "./common.mjs";
+import {
+  getStateNamespace,
+  printMessage,
+  readJsonStdin,
+  repoRoot as defaultRepoRoot,
+} from "./common.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const CHECKPOINT_COOLDOWN_MS = 15 * 60 * 1000;
 
-function getStateRoot(stateHome = process.env.XDG_STATE_HOME) {
-  return resolve(stateHome ?? resolve(homedir(), ".local", "state"), "lattice", "hooks");
+function getStateRoot(stateHome = process.env.XDG_STATE_HOME, repoPath = defaultRepoRoot) {
+  return resolve(
+    stateHome ?? resolve(homedir(), ".local", "state"),
+    getStateNamespace(repoPath),
+    "hooks",
+  );
 }
 
-function getStatePath(stateHome = process.env.XDG_STATE_HOME) {
-  return resolve(getStateRoot(stateHome), "commit-checkpoint.json");
+function getStatePath(stateHome = process.env.XDG_STATE_HOME, repoPath = defaultRepoRoot) {
+  return resolve(getStateRoot(stateHome, repoPath), "commit-checkpoint.json");
 }
 
-function readState(stateHome = process.env.XDG_STATE_HOME) {
-  const statePath = getStatePath(stateHome);
+function readState(stateHome = process.env.XDG_STATE_HOME, repoPath = defaultRepoRoot) {
+  const statePath = getStatePath(stateHome, repoPath);
   try {
     return JSON.parse(readFileSync(statePath, "utf8"));
   } catch {
@@ -28,14 +37,14 @@ function readState(stateHome = process.env.XDG_STATE_HOME) {
   }
 }
 
-function writeState(stateHome, state) {
-  const statePath = getStatePath(stateHome);
+function writeState(stateHome, repoPath, state) {
+  const statePath = getStatePath(stateHome, repoPath);
   mkdirSync(resolve(statePath, ".."), { recursive: true });
   writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
-function clearState(stateHome) {
-  const statePath = getStatePath(stateHome);
+function clearState(stateHome, repoPath) {
+  const statePath = getStatePath(stateHome, repoPath);
   try {
     writeFileSync(statePath, "", "utf8");
   } catch {
@@ -116,13 +125,13 @@ export function buildCommitCheckpointReminder({
   }
 
   if (lines.length === 0) {
-    clearState(stateHome);
+    clearState(stateHome, repoPath);
     return null;
   }
 
   const branchName = getBranchName(repoPath);
   const signature = `${branchName}\n${lines.join("\n")}`;
-  const state = readState(stateHome);
+  const state = readState(stateHome, repoPath);
 
   if (
     state &&
@@ -139,7 +148,7 @@ export function buildCommitCheckpointReminder({
   });
 
   try {
-    writeState(stateHome, { signature, lastReminderAt: now });
+    writeState(stateHome, repoPath, { signature, lastReminderAt: now });
   } catch {
     // If persistence fails, keep the hook advisory rather than breaking tool use.
   }
