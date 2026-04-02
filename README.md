@@ -54,6 +54,32 @@ cp -R lattice/ <your-repo>/hooks/
 If you copy instead of using a submodule, keep the destination path as `hooks/`
 so existing config commands remain valid.
 
+## Client-agnostic quick start
+
+If you want the fastest setup path without committing to any provider yet, use
+this baseline flow:
+
+1. Mount `lattice` at `hooks/` in your repo.
+2. Wire your client to the two shared entry points first:
+   - `hooks/session-start.mjs <client>`
+   - `hooks/pre-tool-policy.mjs <client>`
+3. Add richer lifecycle hooks only if your client supports them:
+   - `hooks/post-tool-reminder.mjs <client>`
+   - `hooks/stop-checklist.mjs <client>`
+4. Treat provider integration as optional. The shared layer works without
+   Serena; a provider only becomes necessary when you want session services such
+   as MCP startup or dashboard helpers.
+5. Validate the mounted package:
+
+```bash
+node --check hooks/common.mjs
+node --check hooks/session-start.mjs
+node --check hooks/pre-tool-policy.mjs
+```
+
+The only hard compatibility rule is that the mounted path stays `hooks/`, so the
+same client commands keep working across repos.
+
 ## Wiring per client
 
 | Client | Config file | Example entry |
@@ -61,6 +87,10 @@ so existing config commands remain valid.
 | Claude Code | `.claude/settings.json` | `node "$CLAUDE_PROJECT_DIR"/hooks/session-start.mjs claude` |
 | GitHub Copilot CLI | `.github/hooks/repo-guardrails.json` | `node ./hooks/session-start.mjs copilot` |
 | Codex CLI | `.codex/hooks.json` | `node "$(git rev-parse --show-toplevel)/hooks/session-start.mjs" codex` |
+
+Start every client with `session-start.mjs` and `pre-tool-policy.mjs`. Treat
+`post-tool-reminder.mjs` and `stop-checklist.mjs` as optional per-client extras,
+not as part of the minimum contract.
 
 ## State and consumer-root detection
 
