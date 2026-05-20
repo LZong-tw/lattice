@@ -293,7 +293,7 @@ Codex uses **two** repo-scoped files:
 ```toml
 # .codex/config.toml
 [features]
-codex_hooks = true
+hooks = true
 ```
 
 ```jsonc

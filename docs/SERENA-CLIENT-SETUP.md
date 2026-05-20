@@ -157,7 +157,7 @@ already calls `session-start.mjs codex`, which triggers Serena bootstrap.
 ```toml
 # .codex/config.toml
 [features]
-codex_hooks = true
+hooks = true
 
 [mcp_servers.serena]
 url = "http://127.0.0.1:9123/mcp"
