@@ -54,6 +54,7 @@ const entryPoints = [
   "stop-checklist.mjs",
   "serena/bootstrap.mjs",
   "serena/dashboard-state.mjs",
+  "serena/mcp-config-guard.mjs",
   "serena/start-http.mjs",
   "serena/open-dashboard.mjs",
 ];

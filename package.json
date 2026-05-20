@@ -13,6 +13,7 @@
     "./stop-checklist": "./stop-checklist.mjs",
     "./serena/bootstrap": "./serena/bootstrap.mjs",
     "./serena/dashboard-state": "./serena/dashboard-state.mjs",
+    "./serena/mcp-config-guard": "./serena/mcp-config-guard.mjs",
     "./serena/start-http": "./serena/start-http.mjs",
     "./serena/open-dashboard": "./serena/open-dashboard.mjs"
   },
@@ -24,7 +25,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "node --check common.mjs && node --check session-start.mjs && node --check provider-registry.mjs && node --check pre-tool-policy.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs",
+    "check": "node --check common.mjs && node --check session-start.mjs && node --check provider-registry.mjs && node --check pre-tool-policy.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/mcp-config-guard.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs",
     "doctor": "node doctor.mjs"
   },
   "repository": {

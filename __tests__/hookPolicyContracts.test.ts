@@ -1,7 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
+
+import { validateRequiredSerenaMcpConfig } from "../serena/mcp-config-guard.mjs";
 
 const packageRoot = process.cwd();
 const node = process.execPath;
@@ -132,6 +135,7 @@ describe("Serena provider contracts", () => {
     const source = readFileSync(resolve(packageRoot, "session-start.mjs"), "utf8");
     expect(source).toContain("./provider-registry.mjs");
     expect(source).toContain("bootstrapProviders");
+    expect(source).toContain("LATTICE_REQUIRE_SERENA_MCP");
   });
 
   it("provider-registry.mjs wires Serena as the default provider", () => {
@@ -196,5 +200,123 @@ describe("Serena provider contracts", () => {
     expect(source).toContain("pickMostRecentActiveClient");
     expect(source).toContain("openExternalUrl");
     expect(source).toContain("--browser");
+  });
+});
+
+describe("Serena MCP startup guard", () => {
+  function createTempRoot() {
+    const root = mkdtempSync(join(tmpdir(), "lattice-serena-mcp-"));
+    mkdirSync(join(root, ".codex"), { recursive: true });
+    return root;
+  }
+
+  function serenaArgs(context: string, root: string) {
+    return [
+      "--from",
+      "git+https://github.com/oraios/serena",
+      "serena",
+      "start-mcp-server",
+      "--context",
+      context,
+      "--project",
+      root,
+    ];
+  }
+
+  it("accepts Claude stdio Serena config with the project preselected", () => {
+    const root = createTempRoot();
+    writeFileSync(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          serena: {
+            command: "uvx",
+            args: serenaArgs("claude-code", root),
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    expect(validateRequiredSerenaMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+  });
+
+  it("accepts project-local Serena wrapper config", () => {
+    const root = createTempRoot();
+    mkdirSync(join(root, "scripts"), { recursive: true });
+    writeFileSync(join(root, "scripts", "serena-mcp.mjs"), "", "utf8");
+    writeFileSync(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          serena: {
+            command: "node",
+            args: ["scripts/serena-mcp.mjs", "claude"],
+          },
+        },
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      join(root, ".codex", "config.toml"),
+      [
+        "[mcp_servers.serena]",
+        'command = "node"',
+        'args = ["scripts/serena-mcp.mjs", "codex"]',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(validateRequiredSerenaMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+    expect(validateRequiredSerenaMcpConfig("codex", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+  });
+
+  it("rejects Claude HTTP Serena config because tools may attach too late", () => {
+    const root = createTempRoot();
+    writeFileSync(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          serena: {
+            type: "http",
+            url: "http://127.0.0.1:9122/mcp",
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const result = validateRequiredSerenaMcpConfig("claude", { root });
+    expect(result.ok).toBe(false);
+    expect(result.failures.join("\n")).toContain("must use stdio command/args");
+  });
+
+  it("accepts Codex stdio Serena config with the project preselected", () => {
+    const root = createTempRoot();
+    writeFileSync(
+      join(root, ".codex", "config.toml"),
+      [
+        "[mcp_servers.serena]",
+        'command = "uvx"',
+        `args = ${JSON.stringify(serenaArgs("codex", root))}`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(validateRequiredSerenaMcpConfig("codex", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
   });
 });

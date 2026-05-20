@@ -86,6 +86,7 @@ START
 | Shared runtime | `*.mjs` | Client-agnostic hook entry points and policy logic |
 | Provider registry | `provider-registry.mjs` | Explicit provider selection and bootstrap contract |
 | Provider integration | `serena/` | Serena-specific lifecycle, launcher, and dashboard helpers |
+| Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena stdio MCP |
 | Tests | `__tests__/` | Package-level runtime and provider contracts |
 | Docs | `docs/` | Provider details and consumer guidance |
 
@@ -99,6 +100,7 @@ Inside this repo, scripts live at the package root:
 - `post-tool-reminder.mjs`
 - `stop-checklist.mjs`
 - `serena/bootstrap.mjs`
+- `serena/mcp-config-guard.mjs`
 
 When mounted inside a consumer repo at `hooks/`, clients execute those same
 files through consumer-facing paths like:
@@ -400,6 +402,7 @@ pnpm run doctor
 # ✓ stop-checklist.mjs parses
 # ✓ serena/bootstrap.mjs parses
 # ✓ serena/dashboard-state.mjs parses
+# ✓ serena/mcp-config-guard.mjs parses
 # ✓ serena/start-http.mjs parses
 # ✓ serena/open-dashboard.mjs parses
 # ✓ package.json exports are valid
