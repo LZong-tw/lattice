@@ -48,6 +48,7 @@ const entryPoints = [
   "common.mjs",
   "session-start.mjs",
   "provider-registry.mjs",
+  "mcp-config-common.mjs",
   "pre-tool-policy.mjs",
   "commit-checkpoint.mjs",
   "post-tool-reminder.mjs",
@@ -57,6 +58,7 @@ const entryPoints = [
   "serena/mcp-config-guard.mjs",
   "serena/start-http.mjs",
   "serena/open-dashboard.mjs",
+  "semble/mcp-config-guard.mjs",
 ];
 
 for (const entry of entryPoints) {
@@ -107,9 +109,9 @@ const uvxResult = spawnSync("uvx", ["--version"], {
 });
 
 if (!uvxResult.error && uvxResult.status === 0) {
-  pass(`uvx available — Serena provider ready (${(uvxResult.stdout || "").trim()})`);
+  pass(`uvx available — Serena and Semble launchers ready (${(uvxResult.stdout || "").trim()})`);
 } else {
-  info("uvx not found — Serena provider unavailable (non-blocking)");
+  info("uvx not found — Serena/Semble launchers unavailable (non-blocking)");
 }
 
 // --- Summary ---

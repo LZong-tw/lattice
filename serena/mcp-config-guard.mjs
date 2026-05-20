@@ -2,6 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { repoRoot } from "../common.mjs";
+import {
+  getArgValue,
+  hasArg,
+  hasOwn,
+  isNodeCommand,
+  isProjectScriptArg,
+  isUvxCommand,
+  parseMcpTomlEntry,
+  readJsonFile,
+} from "../mcp-config-common.mjs";
 
 const EXPECTED_CONTEXT_BY_CLIENT = Object.freeze({
   claude: "claude-code",
@@ -13,68 +23,8 @@ const EXPECTED_WRAPPER_CLIENT_BY_CONTEXT = Object.freeze({
   codex: "codex",
 });
 
-function hasOwn(object, key) {
-  return Object.prototype.hasOwnProperty.call(object, key);
-}
-
-function readJsonFile(filePath) {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    if (!parsed || typeof parsed !== "object") {
-      return { error: "JSON root must be an object" };
-    }
-
-    return parsed;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { error: message };
-  }
-}
-
-function getArgValue(args, flag) {
-  const equalsPrefix = `${flag}=`;
-  for (let index = 0; index < args.length; index += 1) {
-    const value = args[index];
-    if (value === flag) {
-      return args[index + 1] ?? null;
-    }
-
-    if (value.startsWith(equalsPrefix)) {
-      return value.slice(equalsPrefix.length);
-    }
-  }
-
-  return null;
-}
-
-function hasArg(args, value) {
-  return args.includes(value);
-}
-
-function basename(value) {
-  return path.basename(value);
-}
-
-function isUvxCommand(command) {
-  return typeof command === "string" && basename(command) === "uvx";
-}
-
-function isNodeCommand(command) {
-  return typeof command === "string" && basename(command).replace(/\.exe$/i, "") === "node";
-}
-
 function isProjectWrapperArg(arg, root) {
-  if (typeof arg !== "string") {
-    return false;
-  }
-
-  const normalized = path.normalize(arg);
-  const relativeWrapper = path.join("scripts", "serena-mcp.mjs");
-  if (normalized === relativeWrapper) {
-    return true;
-  }
-
-  return path.resolve(root, arg) === path.join(root, relativeWrapper);
+  return isProjectScriptArg(arg, root, path.join("scripts", "serena-mcp.mjs"));
 }
 
 function validateDirectUvxEntry(args, expectedContext, root, label) {
@@ -150,120 +100,6 @@ function validateSerenaStdioEntry(entry, expectedContext, root, label) {
   return failures;
 }
 
-function stripTomlComment(line) {
-  let inString = false;
-  let escaped = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-
-    if (char === "\"") {
-      inString = !inString;
-      continue;
-    }
-
-    if (char === "#" && !inString) {
-      return line.slice(0, index).trimEnd();
-    }
-  }
-
-  return line;
-}
-
-function getTomlTable(text, tableName) {
-  const lines = text.split(/\r?\n/);
-  const header = `[${tableName}]`;
-  const tableLines = [];
-  let inTable = false;
-
-  for (const rawLine of lines) {
-    const line = stripTomlComment(rawLine).trim();
-    if (!line) {
-      continue;
-    }
-
-    if (/^\[[^\]]+\]$/.test(line)) {
-      if (line === header) {
-        inTable = true;
-        continue;
-      }
-
-      if (inTable) {
-        break;
-      }
-    }
-
-    if (inTable) {
-      tableLines.push(line);
-    }
-  }
-
-  return tableLines.length > 0 ? tableLines : null;
-}
-
-function parseTomlString(raw) {
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "string" ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function parseTomlStringArray(raw) {
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.every((item) => typeof item === "string")
-      ? parsed
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function parseSerenaTomlEntry(filePath) {
-  let raw;
-  try {
-    raw = fs.readFileSync(filePath, "utf8");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { error: message };
-  }
-
-  const table = getTomlTable(raw, "mcp_servers.serena");
-  if (!table) {
-    return { entry: null };
-  }
-
-  const entry = {};
-  for (const line of table) {
-    const separatorIndex = line.indexOf("=");
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    const value = line.slice(separatorIndex + 1).trim();
-
-    if (key === "command" || key === "url") {
-      entry[key] = parseTomlString(value);
-    } else if (key === "args") {
-      entry.args = parseTomlStringArray(value);
-    }
-  }
-
-  return { entry };
-}
-
 function validateClaude(root) {
   const filePath = path.join(root, ".mcp.json");
   const parsed = readJsonFile(filePath);
@@ -281,7 +117,7 @@ function validateClaude(root) {
 
 function validateCodex(root) {
   const filePath = path.join(root, ".codex", "config.toml");
-  const parsed = parseSerenaTomlEntry(filePath);
+  const parsed = parseMcpTomlEntry(filePath, "mcp_servers.serena");
   if (parsed.error) {
     return [`Failed to read ${filePath}: ${parsed.error}`];
   }

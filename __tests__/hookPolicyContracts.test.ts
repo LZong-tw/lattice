@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
 import { validateRequiredSerenaMcpConfig } from "../serena/mcp-config-guard.mjs";
+import { validateRequiredSembleMcpConfig } from "../semble/mcp-config-guard.mjs";
 
 const packageRoot = process.cwd();
 const node = process.execPath;
@@ -136,6 +137,7 @@ describe("Serena provider contracts", () => {
     expect(source).toContain("./provider-registry.mjs");
     expect(source).toContain("bootstrapProviders");
     expect(source).toContain("LATTICE_REQUIRE_SERENA_MCP");
+    expect(source).toContain("LATTICE_REQUIRE_SEMBLE_MCP");
   });
 
   it("provider-registry.mjs wires Serena as the default provider", () => {
@@ -200,6 +202,115 @@ describe("Serena provider contracts", () => {
     expect(source).toContain("pickMostRecentActiveClient");
     expect(source).toContain("openExternalUrl");
     expect(source).toContain("--browser");
+  });
+});
+
+describe("Semble MCP startup guard", () => {
+  function createTempRoot() {
+    const root = mkdtempSync(join(tmpdir(), "lattice-semble-mcp-"));
+    mkdirSync(join(root, ".codex"), { recursive: true });
+    return root;
+  }
+
+  function sembleArgs() {
+    return ["--from", "semble[mcp]", "semble"];
+  }
+
+  it("accepts Claude stdio Semble config", () => {
+    const root = createTempRoot();
+    writeFileSync(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          semble: {
+            command: "uvx",
+            args: sembleArgs(),
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    expect(validateRequiredSembleMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+  });
+
+  it("accepts project-local Semble wrapper config", () => {
+    const root = createTempRoot();
+    mkdirSync(join(root, "scripts"), { recursive: true });
+    writeFileSync(join(root, "scripts", "semble-mcp.mjs"), "", "utf8");
+    writeFileSync(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          semble: {
+            command: "node",
+            args: ["scripts/semble-mcp.mjs"],
+          },
+        },
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      join(root, ".codex", "config.toml"),
+      [
+        "[mcp_servers.semble]",
+        'command = "node"',
+        'args = ["scripts/semble-mcp.mjs"]',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(validateRequiredSembleMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+    expect(validateRequiredSembleMcpConfig("codex", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+  });
+
+  it("rejects Claude HTTP Semble config because tools may attach too late", () => {
+    const root = createTempRoot();
+    writeFileSync(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          semble: {
+            type: "http",
+            url: "http://127.0.0.1:9124/mcp",
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const result = validateRequiredSembleMcpConfig("claude", { root });
+    expect(result.ok).toBe(false);
+    expect(result.failures.join("\n")).toContain("must use stdio command/args");
+  });
+
+  it("accepts Codex stdio Semble config", () => {
+    const root = createTempRoot();
+    writeFileSync(
+      join(root, ".codex", "config.toml"),
+      [
+        "[mcp_servers.semble]",
+        'command = "uvx"',
+        `args = ${JSON.stringify(sembleArgs())}`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(validateRequiredSembleMcpConfig("codex", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
   });
 });
 

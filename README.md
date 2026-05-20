@@ -35,7 +35,7 @@ pnpm --version
 # => 9.x.x or higher (used inside lattice for tests; not required in consumer repos)
 ```
 
-**Optional — only if you want Serena provider integration:**
+**Optional — only if you want Serena provider integration or Semble MCP search:**
 
 ```bash
 python3 --version
@@ -66,9 +66,10 @@ START
  │   │       │   ├─ Copilot CLI  → "GitHub Copilot CLI Config"
  │   │       │   └─ Codex CLI    → "Codex CLI Config"
  │   │       │
- │   │       └─ Want Serena provider integration?
- │   │           ├─ YES → also follow docs/SERENA-CLIENT-SETUP.md
- │   │           └─ NO  → shared hooks work standalone, you are done
+ │   │       └─ Want provider/search MCP integration?
+ │   │           ├─ Serena → also follow docs/SERENA-CLIENT-SETUP.md
+ │   │           ├─ Semble → configure startup stdio MCP in the consumer repo
+ │   │           └─ NO     → shared hooks work standalone, you are done
  │   │
  │   NO → Are you EDITING lattice itself?
  │         │
@@ -84,9 +85,11 @@ START
 | Layer | Location | Purpose |
 |-------|----------|---------|
 | Shared runtime | `*.mjs` | Client-agnostic hook entry points and policy logic |
+| MCP config helpers | `mcp-config-common.mjs` | Shared JSON/TOML parser utilities for startup MCP guards |
 | Provider registry | `provider-registry.mjs` | Explicit provider selection and bootstrap contract |
 | Provider integration | `serena/` | Serena-specific lifecycle, launcher, and dashboard helpers |
 | Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena stdio MCP |
+| Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP |
 | Tests | `__tests__/` | Package-level runtime and provider contracts |
 | Docs | `docs/` | Provider details and consumer guidance |
 
@@ -99,8 +102,10 @@ Inside this repo, scripts live at the package root:
 - `commit-checkpoint.mjs`
 - `post-tool-reminder.mjs`
 - `stop-checklist.mjs`
+- `mcp-config-common.mjs`
 - `serena/bootstrap.mjs`
 - `serena/mcp-config-guard.mjs`
+- `semble/mcp-config-guard.mjs`
 
 When mounted inside a consumer repo at `hooks/`, clients execute those same
 files through consumer-facing paths like:
@@ -355,6 +360,36 @@ an ordered list and takes precedence over `LATTICE_PROVIDER=<name>`.
 
 ---
 
+### Step 5 — Semble (Optional)
+
+Semble is code-search MCP, not a lifecycle provider. Configure it in the
+consumer repo's startup MCP surface:
+
+```jsonc
+// .mcp.json
+{
+  "mcpServers": {
+    "semble": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "semble[mcp]", "semble"]
+    }
+  }
+}
+```
+
+```toml
+# .codex/config.toml
+[mcp_servers.semble]
+command = "uvx"
+args = ["--from", "semble[mcp]", "semble"]
+```
+
+If the consumer repo wants SessionStart to fail when this config drifts, set
+`LATTICE_REQUIRE_SEMBLE_MCP=1` in its Claude/Codex SessionStart command.
+
+---
+
 ## Done Criteria (Consumer)
 
 An LLM agent can consider consumer setup **complete** when ALL of these pass:
@@ -365,6 +400,7 @@ An LLM agent can consider consumer setup **complete** when ALL of these pass:
 4. `printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs <client>` → exits 0
 5. The commit-gate smoke test returns `"permissionDecision":"deny"` for `git commit`
 6. (If Serena) `curl -sf http://127.0.0.1:<port>/mcp` responds (see SERENA-CLIENT-SETUP.md)
+7. (If Semble) Claude/Codex MCP config contains a stdio `semble` entry
 
 ---
 
@@ -396,6 +432,7 @@ pnpm run doctor
 # ✓ common.mjs parses
 # ✓ session-start.mjs parses
 # ✓ provider-registry.mjs parses
+# ✓ mcp-config-common.mjs parses
 # ✓ pre-tool-policy.mjs parses
 # ✓ commit-checkpoint.mjs parses
 # ✓ post-tool-reminder.mjs parses
@@ -405,9 +442,10 @@ pnpm run doctor
 # ✓ serena/mcp-config-guard.mjs parses
 # ✓ serena/start-http.mjs parses
 # ✓ serena/open-dashboard.mjs parses
+# ✓ semble/mcp-config-guard.mjs parses
 # ✓ package.json exports are valid
-# (optional) ✓ uvx available — Serena provider ready
-# (optional) ⚠ uvx not found — Serena provider unavailable (non-blocking)
+# (optional) ✓ uvx available — Serena and Semble launchers ready
+# (optional) ⚠ uvx not found — Serena/Semble launchers unavailable (non-blocking)
 #
 # doctor: all checks passed
 ```
