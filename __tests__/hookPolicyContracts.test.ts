@@ -10,11 +10,17 @@ import { validateRequiredSembleMcpConfig } from "../semble/mcp-config-guard.mjs"
 const packageRoot = process.cwd();
 const node = process.execPath;
 
-function runHook(scriptName: string, client: string, payload: Record<string, unknown>) {
+function runHook(
+  scriptName: string,
+  client: string,
+  payload: Record<string, unknown>,
+  env: Record<string, string> = {},
+) {
   const result = spawnSync(node, [resolve(packageRoot, scriptName), client], {
     input: JSON.stringify(payload),
     encoding: "utf8",
     cwd: packageRoot,
+    env: { ...process.env, ...env },
   });
 
   if (result.error) {
@@ -114,6 +120,19 @@ describe("hook entry-point behavior", () => {
     expect(sessionStartSource).toContain("maybePrintCommitCheckpointReminder");
     expect(preToolSource).toContain("commit-checkpoint.mjs");
     expect(preToolSource).toContain("maybePrintCommitCheckpointReminder");
+  });
+
+  it("prints a resume recovery checklist for resume sessions", () => {
+    const result = runHook(
+      "session-start.mjs",
+      "codex",
+      {},
+      { LATTICE_PROVIDER: "none", LATTICE_SESSION_KIND: "resume" },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("RESUME RECOVERY CHECKLIST");
+    expect(result.stderr).toContain("Read the newest user message first");
   });
 });
 

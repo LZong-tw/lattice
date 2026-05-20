@@ -1,14 +1,23 @@
 #!/usr/bin/env node
-import { readJsonStdin } from "./common.mjs";
+import { messages, printMessage, readJsonStdin } from "./common.mjs";
 import { maybePrintCommitCheckpointReminder } from "./commit-checkpoint.mjs";
 import { bootstrapProviders } from "./provider-registry.mjs";
 import { validateRequiredSerenaMcpConfig } from "./serena/mcp-config-guard.mjs";
 import { validateRequiredSembleMcpConfig } from "./semble/mcp-config-guard.mjs";
 
-await readJsonStdin();
+const payload = await readJsonStdin();
 maybePrintCommitCheckpointReminder();
 
 const client = process.argv[2];
+
+const sessionKind =
+  process.env.LATTICE_SESSION_KIND?.trim().toLowerCase() ||
+  (typeof payload.matcher === "string" ? payload.matcher.toLowerCase() : "") ||
+  (typeof payload.session_kind === "string" ? payload.session_kind.toLowerCase() : "");
+
+if (sessionKind === "resume") {
+  printMessage(messages.resumeRecovery);
+}
 
 if (process.env.LATTICE_REQUIRE_SERENA_MCP === "1") {
   const result = validateRequiredSerenaMcpConfig(client);

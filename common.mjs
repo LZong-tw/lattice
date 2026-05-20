@@ -44,6 +44,15 @@ export const messages = {
     " 3. Made UI changes? → Screenshot + scroll ALL areas",
     "───────────────────────",
   ].join("\n"),
+  resumeRecovery: [
+    "↩️  RESUME RECOVERY CHECKLIST",
+    "───────────────────────",
+    " 1. Read the newest user message first; treat it as the active request.",
+    " 2. Check git status and any running tool/dev-server sessions before editing.",
+    " 3. Continue the interrupted task unless the newest request explicitly redirects.",
+    " 4. Re-run the last relevant validation before declaring success.",
+    "───────────────────────",
+  ].join("\n"),
 };
 
 export async function readJsonStdin() {

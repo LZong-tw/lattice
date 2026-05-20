@@ -302,12 +302,23 @@ hooks = true
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
+        "matcher": "startup",
         "hooks": [
           {
             "type": "command",
             "command": "node \"$(git rev-parse --show-toplevel)/hooks/session-start.mjs\" codex",
             "statusMessage": "Checking lattice startup",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "LATTICE_SESSION_KIND=resume node \"$(git rev-parse --show-toplevel)/hooks/session-start.mjs\" codex",
+            "statusMessage": "Recovering session context",
             "timeout": 15
           }
         ]
