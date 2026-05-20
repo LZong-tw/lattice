@@ -90,21 +90,56 @@ export function normalizeToolUse(client, payload) {
   if (client === "copilot") {
     const toolArgs =
       typeof payload.toolArgs === "string" ? parseJsonMaybe(payload.toolArgs) ?? {} : payload.toolArgs ?? {};
+    const filePaths = collectFilePaths(toolArgs);
 
     return {
       toolName: payload.toolName ?? "",
       command: toolArgs.command ?? "",
+      filePath: filePaths[0] ?? "",
+      filePaths,
     };
   }
 
   const toolInput = payload.tool_input ?? payload.toolInput ?? {};
   const commandFromEnv = process.env.CLAUDE_TOOL_INPUT ?? "";
+  const filePaths = collectFilePaths(toolInput);
 
   return {
     toolName: payload.tool_name ?? payload.toolName ?? process.env.CLAUDE_TOOL_NAME ?? "",
     command:
       (typeof toolInput === "object" && toolInput !== null ? toolInput.command : "") || commandFromEnv || "",
+    filePath: filePaths[0] ?? "",
+    filePaths,
   };
+}
+
+function collectFilePaths(input) {
+  if (typeof input !== "object" || input === null) {
+    return [];
+  }
+
+  const candidates = [
+    input.file_path,
+    input.filePath,
+    input.path,
+    input.target_file,
+    input.targetFile,
+  ];
+
+  if (Array.isArray(input.files)) {
+    candidates.push(...input.files);
+  }
+
+  return candidates
+    .flatMap((value) => {
+      if (typeof value === "string") return [value];
+      if (typeof value === "object" && value !== null) {
+        const nested = value.file_path ?? value.filePath ?? value.path;
+        return typeof nested === "string" ? [nested] : [];
+      }
+      return [];
+    })
+    .filter((value, index, values) => value && values.indexOf(value) === index);
 }
 
 export function isGitCommitCommand(command) {

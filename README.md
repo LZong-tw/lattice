@@ -87,6 +87,8 @@ START
 | Shared runtime | `*.mjs` | Client-agnostic hook entry points and policy logic |
 | MCP config helpers | `mcp-config-common.mjs` | Shared JSON/TOML parser utilities for startup MCP guards |
 | Provider registry | `provider-registry.mjs` | Explicit provider selection and bootstrap contract |
+| Verification profile | `verification/` | Stack-aware typecheck/lint detection and optional Stop gate |
+| File protection | `protection.mjs` | Edit guard for env files, `.git/`, and detected lockfiles |
 | Provider integration | `serena/` | Serena-specific lifecycle, launcher, and dashboard helpers |
 | Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena stdio MCP |
 | Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP |
@@ -99,9 +101,12 @@ Inside this repo, scripts live at the package root:
 
 - `session-start.mjs`
 - `pre-tool-policy.mjs`
+- `protection.mjs`
 - `commit-checkpoint.mjs`
 - `post-tool-reminder.mjs`
 - `stop-checklist.mjs`
+- `verification/detect-stack.mjs`
+- `verification/verify.mjs`
 - `mcp-config-common.mjs`
 - `serena/bootstrap.mjs`
 - `serena/mcp-config-guard.mjs`
@@ -186,7 +191,7 @@ and a smoke test.
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|mcp__.*__take_screenshot$",
+        "matcher": "Bash|Edit|MultiEdit|Write|mcp__.*__take_screenshot$",
         "hooks": [
           {
             "type": "command",
@@ -353,7 +358,39 @@ echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node
 
 ---
 
-### Step 4 — Serena (Optional)
+### Step 4 — Verification Profile (Optional)
+
+Lattice includes a Clawback-inspired verification profile for projects that
+want mechanical checks in addition to behavioral reminders:
+
+- `pre-tool-policy.mjs` blocks AI edits to `.env*`, `.envrc`, files under
+  `.git/`, and lockfiles detected from the nearest project stack.
+- `verification/detect-stack.mjs` detects JavaScript/TypeScript, Go, Rust,
+  Python, and PHP project roots and their typecheck/lint commands.
+- `stop-checklist.mjs` can run typecheck + lint before Stop and block Claude
+  when relevant errors are found in changed files.
+- A small circuit breaker allows Stop after repeated verification failures so
+  the agent cannot get trapped forever.
+
+Enable the Stop verification gate by setting this on the Stop hook command:
+
+```jsonc
+{
+  "type": "command",
+  "command": "LATTICE_VERIFY_ON_STOP=1 node \"$CLAUDE_PROJECT_DIR\"/hooks/stop-checklist.mjs",
+  "timeout": 75
+}
+```
+
+Keep it disabled for very large repos until the project has a reliable
+typecheck/lint command surface. The file-protection gate works whenever the
+client's `PreToolUse` matcher includes `Edit|MultiEdit|Write`.
+
+Source inspiration: <https://github.com/LZong-tw/clawback>
+
+---
+
+### Step 5 — Serena (Optional)
 
 The default `session-start.mjs` provider selection is Serena. Serena adds MCP
 server lifecycle and a dashboard. If you want it:
@@ -371,7 +408,7 @@ an ordered list and takes precedence over `LATTICE_PROVIDER=<name>`.
 
 ---
 
-### Step 5 — Semble (Optional)
+### Step 6 — Semble (Optional)
 
 Semble is code-search MCP, not a lifecycle provider. Configure it in the
 consumer repo's startup MCP surface:

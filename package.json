@@ -8,9 +8,12 @@
     "./session-start": "./session-start.mjs",
     "./provider-registry": "./provider-registry.mjs",
     "./pre-tool-policy": "./pre-tool-policy.mjs",
+    "./protection": "./protection.mjs",
     "./commit-checkpoint": "./commit-checkpoint.mjs",
     "./post-tool-reminder": "./post-tool-reminder.mjs",
     "./stop-checklist": "./stop-checklist.mjs",
+    "./verification/detect-stack": "./verification/detect-stack.mjs",
+    "./verification/verify": "./verification/verify.mjs",
     "./mcp-config-common": "./mcp-config-common.mjs",
     "./serena/bootstrap": "./serena/bootstrap.mjs",
     "./serena/dashboard-state": "./serena/dashboard-state.mjs",
@@ -21,6 +24,7 @@
   },
   "files": [
     "*.mjs",
+    "verification/",
     "serena/",
     "semble/",
     "README.md"
@@ -28,7 +32,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "node --check common.mjs && node --check session-start.mjs && node --check provider-registry.mjs && node --check mcp-config-common.mjs && node --check pre-tool-policy.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/mcp-config-guard.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs && node --check semble/mcp-config-guard.mjs",
+    "check": "node --check common.mjs && node --check session-start.mjs && node --check provider-registry.mjs && node --check mcp-config-common.mjs && node --check pre-tool-policy.mjs && node --check protection.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check verification/detect-stack.mjs && node --check verification/verify.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/mcp-config-guard.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs && node --check semble/mcp-config-guard.mjs",
     "doctor": "node doctor.mjs"
   },
   "repository": {

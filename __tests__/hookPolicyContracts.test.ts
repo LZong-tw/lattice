@@ -112,6 +112,59 @@ describe("hook entry-point behavior", () => {
     expect(postEdit.stderr).toMatch(/reusable lesson/i);
   });
 
+  it("denies AI edits to environment files", () => {
+    const root = mkdtempSync(join(tmpdir(), "lattice-protect-env-"));
+    const result = runHook("pre-tool-policy.mjs", "claude", {
+      tool_name: "Edit",
+      tool_input: { file_path: join(root, ".env") },
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(
+      expect.objectContaining({
+        hookSpecificOutput: expect.objectContaining({
+          permissionDecision: "deny",
+          permissionDecisionReason: expect.stringContaining("Environment files"),
+        }),
+      }),
+    );
+  });
+
+  it("denies AI edits to detected lockfiles", () => {
+    const root = mkdtempSync(join(tmpdir(), "lattice-protect-lockfile-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: {} }), "utf8");
+    writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n", "utf8");
+
+    const result = runHook("pre-tool-policy.mjs", "claude", {
+      tool_name: "Write",
+      tool_input: { file_path: join(root, "pnpm-lock.yaml") },
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(
+      expect.objectContaining({
+        hookSpecificOutput: expect.objectContaining({
+          permissionDecision: "deny",
+          permissionDecisionReason: expect.stringContaining("lockfile pnpm-lock.yaml"),
+        }),
+      }),
+    );
+  });
+
+  it("keeps Stop verification optional and no-ops when no stack is detected", () => {
+    const root = mkdtempSync(join(tmpdir(), "lattice-stop-no-stack-"));
+    const result = runHook(
+      "stop-checklist.mjs",
+      "claude",
+      { cwd: root, session_id: "test-session" },
+      { LATTICE_VERIFY_ON_STOP: "1" },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("END-OF-TURN CHECKLIST");
+    expect(result.stdout).toBe("");
+  });
+
   it("wires the commit checkpoint reminder through the shared entry points", () => {
     const sessionStartSource = readFileSync(resolve(packageRoot, "session-start.mjs"), "utf8");
     const preToolSource = readFileSync(resolve(packageRoot, "pre-tool-policy.mjs"), "utf8");
