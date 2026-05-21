@@ -45,20 +45,37 @@ if (major >= 18) {
 
 // --- Entry point syntax checks ---
 const entryPoints = [
+  "index.mjs",
   "common.mjs",
   "session-start.mjs",
   "provider-registry.mjs",
+  "codex-hook-runner.mjs",
   "mcp-config-common.mjs",
   "pre-tool-policy.mjs",
+  "protection.mjs",
   "commit-checkpoint.mjs",
   "post-tool-reminder.mjs",
   "stop-checklist.mjs",
+  "client-enum.mjs",
+  "context.mjs",
+  "dispatcher.mjs",
+  "timeouts.mjs",
+  "testing.mjs",
+  "register-builtins.mjs",
+  "builtins/protection-provider.mjs",
+  "builtins/stop-checklist-provider.mjs",
+  "builtins/reminders-provider.mjs",
+  "verification/detect-stack.mjs",
+  "verification/verify.mjs",
   "serena/bootstrap.mjs",
   "serena/dashboard-state.mjs",
   "serena/mcp-config-guard.mjs",
   "serena/start-http.mjs",
   "serena/open-dashboard.mjs",
+  "serena/provider.mjs",
   "semble/mcp-config-guard.mjs",
+  "semble/provider.mjs",
+  "rtk/provider.mjs",
 ];
 
 for (const entry of entryPoints) {
@@ -81,15 +98,32 @@ for (const entry of entryPoints) {
 }
 
 // --- package.json exports are valid ---
+function collectExportTargets(value) {
+  if (typeof value === "string") {
+    return [value];
+  }
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  return Object.values(value).flatMap(collectExportTargets);
+}
+
 try {
   const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"));
   const exports = pkg.exports ?? {};
   let allExist = true;
 
-  for (const [key, target] of Object.entries(exports)) {
-    const targetPath = resolve(__dirname, target);
-    if (!existsSync(targetPath)) {
-      fail(`package.json export ${key} → ${target}`, "target file not found");
+  for (const [key, targetSpec] of Object.entries(exports)) {
+    for (const target of collectExportTargets(targetSpec)) {
+      const targetPath = resolve(__dirname, target);
+      if (!existsSync(targetPath)) {
+        fail(`package.json export ${key} → ${target}`, "target file not found");
+        allExist = false;
+      }
+    }
+
+    if (collectExportTargets(targetSpec).length === 0) {
+      fail(`package.json export ${key}`, "no file target found");
       allExist = false;
     }
   }

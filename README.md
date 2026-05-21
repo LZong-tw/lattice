@@ -131,6 +131,7 @@ START
 | Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena stdio MCP. |
 | Semble provider | `semble/provider.mjs` | Semble v1 provider definition. |
 | Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP. |
+| RTK provider | `rtk/provider.mjs` | Optional PreToolUse command rewrite through `rtk rewrite` for token-compacted shell output. |
 | Examples | `examples/` | Reference adapters (e.g. `clawback-adapter/`) showing how external providers map onto the v1 contract. |
 | Tests | `__tests__/` | Package-level runtime and provider contracts. |
 | Docs | `docs/` | Provider details, rollout flow, and consumer guidance. |
@@ -152,6 +153,7 @@ Inside this repo, scripts live at the package root:
 - `serena/bootstrap.mjs`
 - `serena/mcp-config-guard.mjs`
 - `semble/mcp-config-guard.mjs`
+- `rtk/provider.mjs`
 
 When mounted inside a consumer repo at `hooks/`, clients execute those same
 files through consumer-facing paths like:
@@ -496,6 +498,32 @@ If the consumer repo wants SessionStart to fail when this config drifts, set
 
 ---
 
+### Step 7 — RTK (Optional)
+
+[RTK](https://github.com/rtk-ai/rtk) is not an MCP server. It is a CLI proxy
+that rewrites common shell commands to token-compacted `rtk ...` equivalents.
+The bundled `rtk` provider runs on Claude/Codex `PreToolUse` Bash commands and
+delegates the rewrite decision to `rtk rewrite`.
+
+Default behavior is fail-open:
+
+- If `rtk` is missing, times out, or returns no rewrite, the original command runs.
+- `git commit` commands are never rewritten so the Lattice commit gate remains the
+  source of truth.
+- `RTK_DISABLED=1 <command>` and `LATTICE_RTK_DISABLED=1` skip the provider.
+- Set `LATTICE_REQUIRE_RTK=1` during `SessionStart` only when the repo wants
+  startup to fail if `rtk` is unavailable.
+
+Useful knobs:
+
+```bash
+LATTICE_RTK_BIN=/opt/homebrew/bin/rtk
+LATTICE_RTK_TIMEOUT_MS=2000
+LATTICE_REQUIRE_RTK=1
+```
+
+---
+
 ## Done Criteria (Consumer)
 
 An LLM agent can consider consumer setup **complete** when ALL of these pass:
@@ -507,6 +535,7 @@ An LLM agent can consider consumer setup **complete** when ALL of these pass:
 5. The commit-gate smoke test returns `"permissionDecision":"deny"` for `git commit`
 6. (If Serena) `curl -sf http://127.0.0.1:<port>/mcp` responds (see SERENA-CLIENT-SETUP.md)
 7. (If Semble) Claude/Codex MCP config contains a stdio `semble` entry
+8. (If RTK is required) `rtk --version` exits 0 in the AI client's hook environment
 
 ---
 
@@ -627,6 +656,7 @@ Defaults (overridable via `LATTICE_TIMEOUT_<EVENT_IN_SCREAMING_SNAKE>=ms`):
 | `lattice/stop-checklist` | Stop | Print the end-of-turn checklist; optionally gate with verification (`LATTICE_VERIFY_ON_STOP=1`). |
 | `serena` | SessionStart, validator | Bootstrap [Serena](https://github.com/oraios/serena) MCP server; validate `.mcp.json` / `.codex/config.toml` when `LATTICE_REQUIRE_SERENA_MCP=1`. |
 | `semble` | validator only | Validate Semble MCP config when `LATTICE_REQUIRE_SEMBLE_MCP=1`. Skipped for Copilot. |
+| `rtk` | PreToolUse, validator | Optionally rewrite Claude/Codex Bash commands via `rtk rewrite`; validate the binary only when `LATTICE_REQUIRE_RTK=1`. Skipped for Copilot. |
 
 ### Writing your own provider
 

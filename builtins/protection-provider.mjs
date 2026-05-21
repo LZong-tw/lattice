@@ -22,6 +22,13 @@ import {
 } from "../common.mjs";
 import { getProtectedFileEditFailure } from "../protection.mjs";
 
+function isCommitGateConfirmed(command, env) {
+  return (
+    env.LATTICE_COMMIT_GATE_CONFIRMED === "1" ||
+    /(^|\s)LATTICE_COMMIT_GATE_CONFIRMED=1(\s|$)/.test(command)
+  );
+}
+
 const CANONICAL_TO_BARE_CLIENT = Object.freeze({
   "claude-code": "claude",
   codex: "codex",
@@ -43,7 +50,11 @@ function checkProtection(ctx, payload) {
     }
   }
 
-  if (isBashTool(toolName) && isGitCommitCommand(command)) {
+  if (
+    isBashTool(toolName) &&
+    isGitCommitCommand(command) &&
+    !isCommitGateConfirmed(command, ctx.env)
+  ) {
     return { decision: "deny", reason: messages.commitGate };
   }
 

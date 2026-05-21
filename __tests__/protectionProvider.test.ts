@@ -123,6 +123,33 @@ describe("protectionProvider PreToolUse — commit gate", () => {
     expect(result.reason).toMatch(/PRE-COMMIT GATE/);
   });
 
+  it("allows git commit when the confirmation env var is set", async () => {
+    const { result } = await runProvider(
+      protectionProvider,
+      "PreToolUse",
+      mockPayload.preToolUse({
+        tool_name: "Bash",
+        tool_input: { command: "git commit -m 'foo'" },
+      }),
+      { contextOverrides: { env: { LATTICE_COMMIT_GATE_CONFIRMED: "1" } } },
+    );
+    expect(result).toEqual({});
+  });
+
+  it("allows git commit when the confirmation prefix is on the command", async () => {
+    const { result } = await runProvider(
+      protectionProvider,
+      "PreToolUse",
+      mockPayload.preToolUse({
+        tool_name: "Bash",
+        tool_input: {
+          command: "LATTICE_COMMIT_GATE_CONFIRMED=1 git commit -m 'foo'",
+        },
+      }),
+    );
+    expect(result).toEqual({});
+  });
+
   it("allows non-commit Bash invocations", async () => {
     const { result } = await runProvider(
       protectionProvider,

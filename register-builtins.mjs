@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * register-builtins.mjs — side-effect module that registers every built-in
- * v1 provider plus the bundled MCP providers (Serena, Semble), then
+ * v1 provider plus the bundled optional providers (Serena, Semble, RTK), then
  * optionally loads external providers listed in `LATTICE_EXTRA_PROVIDERS`.
  *
  * Every hook entry point in this repo (`session-start.mjs`,
@@ -33,6 +33,7 @@ import {
 } from "./builtins/reminders-provider.mjs";
 import { serenaProvider } from "./serena/provider.mjs";
 import { sembleProvider } from "./semble/provider.mjs";
+import { rtkProvider } from "./rtk/provider.mjs";
 
 registerProvider(protectionProvider);
 registerProvider(commitCheckpointProvider);
@@ -41,6 +42,7 @@ registerProvider(editReminderProvider);
 registerProvider(stopChecklistProvider);
 registerProvider(serenaProvider);
 registerProvider(sembleProvider);
+registerProvider(rtkProvider);
 
 const extra = (process.env.LATTICE_EXTRA_PROVIDERS ?? "")
   .split(",")

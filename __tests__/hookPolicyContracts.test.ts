@@ -276,6 +276,10 @@ describe("Serena provider contracts", () => {
       resolve(packageRoot, "semble/provider.mjs"),
       "utf8",
     );
+    const rtkProviderSource = readFileSync(
+      resolve(packageRoot, "rtk/provider.mjs"),
+      "utf8",
+    );
 
     // Entry point uses dispatch + register-builtins; legacy
     // bootstrapProviders / LATTICE_REQUIRE_*_MCP env handling have moved
@@ -284,8 +288,10 @@ describe("Serena provider contracts", () => {
     expect(sessionStartSource).toContain("register-builtins.mjs");
     expect(registerSource).toContain("registerProvider(serenaProvider)");
     expect(registerSource).toContain("registerProvider(sembleProvider)");
+    expect(registerSource).toContain("registerProvider(rtkProvider)");
     expect(serenaProviderSource).toContain("LATTICE_REQUIRE_SERENA_MCP");
     expect(sembleProviderSource).toContain("LATTICE_REQUIRE_SEMBLE_MCP");
+    expect(rtkProviderSource).toContain("LATTICE_REQUIRE_RTK");
   });
 
   it("provider-registry.mjs wires Serena as the default provider", () => {
