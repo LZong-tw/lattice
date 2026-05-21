@@ -125,6 +125,11 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "typescript": "^5.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.1.7"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite@>=8.0.0 <=8.0.4": ">=8.0.5"
+    }
   }
 }
