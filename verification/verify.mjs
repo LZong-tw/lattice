@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, resolve } from "node:path";
+import { basename, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { getStateNamespace, repoRoot } from "../common.mjs";
@@ -87,9 +87,38 @@ function commandLabel(command) {
   return [command.cmd, ...command.args].join(" ");
 }
 
+/**
+ * Resolve the starting directory for project verification.
+ *
+ * `payload.cwd` is controlled by whatever process feeds the hook over
+ * stdin — in adversarial scenarios this can point at an attacker-staged
+ * project tree containing a hostile package.json `scripts.typecheck`.
+ *
+ * Containment policy: when `LATTICE_REPO_ROOT` is set (operator-asserted
+ * trusted repo), the resolved cwd must equal or be a descendant of
+ * `fallbackRoot`. On violation we log to stderr and fall back. When
+ * `LATTICE_REPO_ROOT` is unset, ctx.repoRoot may collapse to the lattice
+ * install dir (which is rarely the user's project), so we accept
+ * payload.cwd verbatim and rely on the provider-level guard to clamp.
+ */
 function rootFromPayload(payload, fallbackRoot) {
   const cwd = typeof payload.cwd === "string" ? payload.cwd : "";
-  return cwd ? resolve(cwd) : fallbackRoot;
+  if (!cwd) return fallbackRoot;
+
+  if (!process.env.LATTICE_REPO_ROOT) {
+    return resolve(cwd);
+  }
+
+  const resolved = resolve(cwd);
+  const fallback = resolve(fallbackRoot);
+  const boundary = fallback.endsWith(sep) ? fallback : fallback + sep;
+  if (resolved === fallback || resolved.startsWith(boundary)) {
+    return resolved;
+  }
+  process.stderr.write(
+    `lattice: ignoring payload.cwd "${cwd}" — outside LATTICE_REPO_ROOT "${fallback}". Falling back to repoRoot.\n`,
+  );
+  return fallback;
 }
 
 export function formatVerificationFailure(failures) {

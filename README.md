@@ -1,14 +1,42 @@
 # lattice
 
+[![CI](https://github.com/lzong-tw/lattice/actions/workflows/test.yml/badge.svg)](https://github.com/lzong-tw/lattice/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](#prerequisites)
+
+## Install
+
+```bash
+# In your consumer repo:
+pnpm add @lattice/core            # or: npm install @lattice/core / yarn add @lattice/core
+
+# Mount the hook scripts at the stable `hooks/` path your client configs point at:
+mkdir -p hooks
+node -e "import('node:fs').then(({cpSync})=>cpSync('node_modules/@lattice/core','hooks',{recursive:true}))"
+
+# Validate:
+node --check hooks/session-start.mjs && echo OK
+```
+
+Prefer a git submodule? See [Consumer Setup](#consumer-setup) below.
+
+---
+
 `lattice` is a repo-scoped AI client runtime layer: shared hook entry points,
 policy gates, lifecycle reminders, and provider integrations for
 **Claude Code**, **GitHub Copilot CLI**, and **Codex CLI**.
 
 This repo is designed to be mounted into a consuming repo at the stable path
-`hooks/`. The shared hook logic stays provider-agnostic. `session-start.mjs`
-now selects providers through an explicit registry contract: Serena remains the
-default, and you can override or disable provider bootstrap with environment
-variables.
+`hooks/`. Each hook entry point is a thin shim around a v1 dispatcher that
+fans the event out to every registered provider, then merges their results
+into the Anthropic-spec response shape. Providers ship as separate npm
+packages or live in-tree under `builtins/`, `serena/`, and `semble/`.
+
+**Companion projects:**
+- [`@lattice/clawback`](https://github.com/lzong-tw/clawback) — verification
+  gates (file protection, post-edit format/lint, stop-time typecheck) packaged
+  as a v1 lattice provider. See `examples/clawback-adapter/` in this repo for
+  a stub showing the integration shape.
 
 ---
 
@@ -84,22 +112,35 @@ START
 
 | Layer | Location | Purpose |
 |-------|----------|---------|
-| Shared runtime | `*.mjs` | Client-agnostic hook entry points and policy logic |
-| MCP config helpers | `mcp-config-common.mjs` | Shared JSON/TOML parser utilities for startup MCP guards |
-| Provider registry | `provider-registry.mjs` | Explicit provider selection and bootstrap contract |
-| Verification profile | `verification/` | Stack-aware typecheck/lint detection and optional Stop gate |
-| File protection | `protection.mjs` | Edit guard for env files, `.git/`, and detected lockfiles |
-| Provider integration | `serena/` | Serena-specific lifecycle, launcher, and dashboard helpers |
-| Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena stdio MCP |
-| Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP |
-| Tests | `__tests__/` | Package-level runtime and provider contracts |
-| Docs | `docs/` | Provider details and consumer guidance |
+| Public barrel | `index.mjs` | Root `@lattice/core` export — re-exports the user-facing surface (`registerProvider`, `dispatch`, constants, types). |
+| TypeScript contract | `lattice.d.ts` | Public type definitions for `LatticeProvider`, `LatticeContext`, `LatticeHandlerResult`, and helpers. |
+| Dispatcher | `dispatcher.mjs` | v1 event dispatcher — fans events to every registered provider and merges results into Anthropic response shape. |
+| Context | `context.mjs` | Builds the frozen `LatticeContext` (cwd, repoRoot, stateDir, env snapshot, signal) per dispatch. |
+| Client enum | `client-enum.mjs` | `normalizeClient()` canonicalization (`claude` → `claude-code`, etc.). |
+| Timeouts | `timeouts.mjs` | Per-event timeout defaults + `LATTICE_TIMEOUT_*` overrides driving `ctx.signal`. |
+| Provider registry | `provider-registry.mjs` | `registerProvider`, selection rules, legacy `bootstrapProviders` (deprecated). |
+| Built-in registration | `register-builtins.mjs` | Self-registers built-in providers; also loads `LATTICE_EXTRA_PROVIDERS=<spec>` packages. |
+| Built-in providers | `builtins/` | `protection`, `commit-checkpoint`, `screenshot-reminder`, `edit-reminder`, `stop-checklist` v1 providers. |
+| Shared runtime | `*.mjs` (root) | Client-agnostic hook entry points and policy logic (`session-start.mjs`, `pre-tool-policy.mjs`, `stop-checklist.mjs`, etc.). |
+| Codex runner | `codex-hook-runner.mjs` | Forwards Codex hook payloads to the right entry script (driven by `LATTICE_HOOK_TARGET` / `LATTICE_HOOK_CLIENT`). |
+| Testing helpers | `testing.mjs` | `mockContext`, `runProvider`, `mockPayload` — published as `@lattice/core/testing`. |
+| MCP config helpers | `mcp-config-common.mjs` | Shared JSON/TOML parser utilities for startup MCP guards. |
+| File protection | `protection.mjs` | Edit guard for env files, `.git/`, and detected lockfiles. |
+| Verification profile | `verification/` | Stack-aware typecheck/lint detection and optional Stop gate. |
+| Serena provider | `serena/` | Serena-specific lifecycle, launcher, dashboard helpers, and v1 provider definition. |
+| Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena stdio MCP. |
+| Semble provider | `semble/provider.mjs` | Semble v1 provider definition. |
+| Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP. |
+| Examples | `examples/` | Reference adapters (e.g. `clawback-adapter/`) showing how external providers map onto the v1 contract. |
+| Tests | `__tests__/` | Package-level runtime and provider contracts. |
+| Docs | `docs/` | Provider details, rollout flow, and consumer guidance. |
 
 ## Consumer Path Contract
 
 Inside this repo, scripts live at the package root:
 
 - `session-start.mjs`
+- `codex-hook-runner.mjs`
 - `pre-tool-policy.mjs`
 - `protection.mjs`
 - `commit-checkpoint.mjs`
@@ -116,6 +157,7 @@ When mounted inside a consumer repo at `hooks/`, clients execute those same
 files through consumer-facing paths like:
 
 - `hooks/session-start.mjs`
+- `hooks/codex-hook-runner.mjs`
 - `hooks/pre-tool-policy.mjs`
 - `hooks/serena/open-dashboard.mjs`
 
@@ -139,8 +181,8 @@ git submodule update --init --recursive
 Expected result:
 
 ```bash
-ls hooks/common.mjs hooks/session-start.mjs hooks/pre-tool-policy.mjs
-# => hooks/common.mjs  hooks/session-start.mjs  hooks/pre-tool-policy.mjs
+ls hooks/common.mjs hooks/session-start.mjs hooks/codex-hook-runner.mjs hooks/pre-tool-policy.mjs
+# => hooks/common.mjs  hooks/session-start.mjs  hooks/codex-hook-runner.mjs  hooks/pre-tool-policy.mjs
 ```
 
 **Option B: Directory copy**
@@ -156,7 +198,7 @@ so existing config commands remain valid.
 
 ```bash
 cd /path/to/your-consumer-repo
-node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/pre-tool-policy.mjs && echo "OK"
+node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs && echo "OK"
 # => OK
 ```
 
@@ -301,6 +343,11 @@ Codex uses **two** repo-scoped files:
 hooks = true
 ```
 
+Codex hook commands should dispatch through `hooks/codex-hook-runner.mjs`
+instead of `$(git rev-parse --show-toplevel)`. Codex can invoke hooks from a
+shell cwd outside the repo; the runner resolves the mounted `hooks/` directory
+from the hook payload `cwd` and then forwards stdin to the real hook script.
+
 ```jsonc
 // .codex/hooks.json
 {
@@ -311,7 +358,7 @@ hooks = true
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/hooks/session-start.mjs\" codex",
+            "command": "LATTICE_HOOK_TARGET=session-start.mjs LATTICE_HOOK_CLIENT=codex node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
             "statusMessage": "Checking lattice startup",
             "timeout": 15
           }
@@ -322,7 +369,7 @@ hooks = true
         "hooks": [
           {
             "type": "command",
-            "command": "LATTICE_SESSION_KIND=resume node \"$(git rev-parse --show-toplevel)/hooks/session-start.mjs\" codex",
+            "command": "LATTICE_SESSION_KIND=resume LATTICE_HOOK_TARGET=session-start.mjs LATTICE_HOOK_CLIENT=codex node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
             "statusMessage": "Recovering session context",
             "timeout": 15
           }
@@ -335,7 +382,7 @@ hooks = true
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/hooks/pre-tool-policy.mjs\" codex",
+            "command": "LATTICE_HOOK_TARGET=pre-tool-policy.mjs LATTICE_HOOK_CLIENT=codex node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
             "statusMessage": "Applying lattice guardrails",
             "timeout": 15
           }
@@ -392,19 +439,30 @@ Source inspiration: <https://github.com/LZong-tw/clawback>
 
 ### Step 5 — Serena (Optional)
 
-The default `session-start.mjs` provider selection is Serena. Serena adds MCP
-server lifecycle and a dashboard. If you want it:
+By default, the v1 dispatcher activates **every registered provider** —
+that includes the built-ins (`lattice/protection`, `lattice/commit-checkpoint`,
+the reminders, `lattice/stop-checklist`) plus `serena` and `semble`. The
+Serena provider adds MCP server lifecycle and a dashboard; if you want to
+use it:
 
 → Follow [`docs/SERENA-CLIENT-SETUP.md`](docs/SERENA-CLIENT-SETUP.md)
 
-If you want the shared hooks without any provider bootstrap, explicitly disable
-providers in the environment that invokes `session-start.mjs`:
+If you do **not** want Serena, opt it out without disabling the rest:
 
-- `LATTICE_PROVIDER=none`
-- `LATTICE_PROVIDERS=none`
+- `LATTICE_DISABLE=serena`
 
-If you add another provider later, `LATTICE_PROVIDERS=<name1>,<name2>` selects
-an ordered list and takes precedence over `LATTICE_PROVIDER=<name>`.
+If you want the shared hooks without any provider at all, disable everything:
+
+- `LATTICE_PROVIDERS=none` (or `off` / `false` / `0`)
+
+You can also restrict the active set to an explicit allowlist with
+`LATTICE_PROVIDERS=<name1>,<name2>`, which takes precedence over
+`LATTICE_PROVIDER=<name>`.
+
+> **Note**: the legacy `bootstrapProviders` path on `provider-registry.mjs`
+> still defaults to `["serena"]` for backwards compatibility, but it is
+> `@deprecated` and unused by the shipped hook entry points. New code
+> should not rely on it.
 
 ---
 
@@ -443,7 +501,7 @@ If the consumer repo wants SessionStart to fail when this config drifts, set
 An LLM agent can consider consumer setup **complete** when ALL of these pass:
 
 1. `ls hooks/common.mjs` → file exists
-2. `node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/pre-tool-policy.mjs` → exits 0
+2. `node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs` → exits 0
 3. The client config file exists at the correct path (see per-client sections above)
 4. `printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs <client>` → exits 0
 5. The commit-gate smoke test returns `"permissionDecision":"deny"` for `git commit`
@@ -519,30 +577,69 @@ You can override detection when needed:
 
 ## Provider Integration
 
-Provider bootstrap is selected through `provider-registry.mjs` with this
-contract:
+Each hook event is dispatched to every registered provider whose `handlers`
+map declares that event. Built-in providers (file protection, commit gate,
+checklist, reminders, Serena, Semble) self-register via
+`register-builtins.mjs`. External providers ship as npm packages whose import
+side-effect calls `registerProvider`.
+
+### Selection env vars (summary)
 
 | Variable | Behaviour |
 |----------|-----------|
-| _(none set)_ | Default to `serena` |
-| `LATTICE_PROVIDER=<name>` | Select one provider |
-| `LATTICE_PROVIDERS=<name1>,<name2>` | Select an ordered list; takes precedence |
-| `LATTICE_PROVIDER=none` / `LATTICE_PROVIDERS=none` | Disable all providers |
+| _(none set)_ | Dispatcher activates every registered provider (built-ins + Serena + Semble + anything loaded via `LATTICE_EXTRA_PROVIDERS`). |
+| `LATTICE_PROVIDERS=<n1>,<n2>` | Explicit ordered allowlist; unknown names fail fast. |
+| `LATTICE_PROVIDER=<name>` | Single-provider allowlist; superseded by `LATTICE_PROVIDERS`. |
+| `LATTICE_DISABLE=<n1>,<n2>` | Subtract these names from the active list. |
+| `LATTICE_PROVIDERS=none` (or `off` / `false` / `0`) | Disable all providers. |
+| `LATTICE_EXTRA_PROVIDERS=<spec1>,<spec2>` | Dynamically `import()` external provider modules at register-builtins load time. |
 
-Explicit provider names are validated. Unknown names fail fast with exit code 1.
+For the **full** list of `LATTICE_*` env vars — including timeouts, Codex
+runner controls, built-in provider settings (`LATTICE_VERIFY_*`,
+`LATTICE_REQUIRE_SERENA_MCP`, `LATTICE_REQUIRE_SEMBLE_MCP`), and the naming
+carve-out for legacy names — see
+[`docs/PROVIDER-AUTHORING.md`](docs/PROVIDER-AUTHORING.md) § "Reserved env
+vars".
 
-The current real provider is [Serena](https://github.com/oraios/serena). See
-[`docs/SERENA-CLIENT-SETUP.md`](docs/SERENA-CLIENT-SETUP.md) for full
-provider setup with per-client endpoints, smoke tests, and troubleshooting.
+### Per-event timeouts
 
-If you are adding another provider (for example `mcp-local-rag`) and need it to
-flow cleanly into consumer repos, use
-[`docs/PROVIDER-ROLLOUT.md`](docs/PROVIDER-ROLLOUT.md). That doc covers the full
-chain from provider code in `lattice` to submodule upgrades, consumer config,
-and rollout validation.
+Every dispatch carries an `AbortSignal` driven by a per-event timeout.
+Defaults (overridable via `LATTICE_TIMEOUT_<EVENT_IN_SCREAMING_SNAKE>=ms`):
 
-To add a different provider, create a provider subdirectory with a
-`bootstrap.mjs` entry point and register it in `provider-registry.mjs`.
+| Event | Default | Env override |
+|---|---|---|
+| `PreToolUse` | 5_000 ms | `LATTICE_TIMEOUT_PRE_TOOL_USE` |
+| `PostToolUse` | 5_000 ms | `LATTICE_TIMEOUT_POST_TOOL_USE` |
+| `Stop` | 60_000 ms | `LATTICE_TIMEOUT_STOP` |
+| `SessionStart` | 30_000 ms | `LATTICE_TIMEOUT_SESSION_START` |
+| `PostCompact` | 10_000 ms | `LATTICE_TIMEOUT_POST_COMPACT` |
+| `Notification` | 5_000 ms | `LATTICE_TIMEOUT_NOTIFICATION` |
+| (any other) | 30_000 ms | `LATTICE_TIMEOUT_DEFAULT` |
+
+### Built-in providers
+
+| Provider | Events | Purpose |
+|---|---|---|
+| `lattice/protection` | PreToolUse | Deny edits to `.env*`, `.git/`, detected lockfiles. Deny `git commit` Bash commands. |
+| `lattice/commit-checkpoint` | SessionStart, PreToolUse | Nag when the working tree is dirty (with cooldown). |
+| `lattice/screenshot-reminder` | PreToolUse | (claude-code only) Remind to scroll all areas after a screenshot. |
+| `lattice/edit-reminder` | PostToolUse | Remind to log lessons after edits. |
+| `lattice/stop-checklist` | Stop | Print the end-of-turn checklist; optionally gate with verification (`LATTICE_VERIFY_ON_STOP=1`). |
+| `serena` | SessionStart, validator | Bootstrap [Serena](https://github.com/oraios/serena) MCP server; validate `.mcp.json` / `.codex/config.toml` when `LATTICE_REQUIRE_SERENA_MCP=1`. |
+| `semble` | validator only | Validate Semble MCP config when `LATTICE_REQUIRE_SEMBLE_MCP=1`. Skipped for Copilot. |
+
+### Writing your own provider
+
+See [`docs/PROVIDER-AUTHORING.md`](docs/PROVIDER-AUTHORING.md) for the full v1
+contract (definition shape, handler signature, result merge rules, validator
+semantics, testing helpers).
+
+For the release/rollout flow when shipping a new provider into a consumer
+repo, see [`docs/PROVIDER-ROLLOUT.md`](docs/PROVIDER-ROLLOUT.md).
+
+The current real MCP provider is [Serena](https://github.com/oraios/serena);
+see [`docs/SERENA-CLIENT-SETUP.md`](docs/SERENA-CLIENT-SETUP.md) for per-client
+endpoints, smoke tests, and troubleshooting.
 
 ---
 

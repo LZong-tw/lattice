@@ -1,0 +1,88 @@
+name: Bug Report
+description: A defect in @lattice/core or one of its built-in providers
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please fill in every field — terse reports take
+        many more round-trips than complete ones.
+
+        For security vulnerabilities, do NOT use this form. Email instead per
+        [SECURITY.md](../SECURITY.md).
+
+  - type: input
+    id: lattice-version
+    attributes:
+      label: "@lattice/core version"
+      description: From your `package.json` or `pnpm list @lattice/core`
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: Output of `node --version`
+      placeholder: "v20.11.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: AI client
+      options:
+        - Claude Code
+        - GitHub Copilot CLI
+        - Codex CLI
+        - other / not applicable
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15.0 / Ubuntu 24.04 / Windows 11"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: |
+        Ideally: the exact dispatcher invocation, the stdin payload, and any
+        relevant env vars (`LATTICE_PROVIDERS`, `LATTICE_TIMEOUT_*`, ...).
+      placeholder: |
+        ```bash
+        echo '{"tool_name":"Bash","tool_input":{"command":"git commit"}}' \
+          | node hooks/pre-tool-policy.mjs claude
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include any stderr output and the exit code
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Logs, screenshots, related issues, workarounds you've found
+    validations:
+      required: false

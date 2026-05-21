@@ -1,12 +1,69 @@
 {
-  "name": "lattice",
+  "name": "@lattice/core",
   "version": "0.1.0",
   "description": "General-purpose AI-client hook layer — repo-scoped guardrails and lifecycle hooks for Claude Code, GitHub Copilot CLI, and Codex CLI",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "types": "./lattice.d.ts",
   "exports": {
+    ".": {
+      "types": "./lattice.d.ts",
+      "import": "./index.mjs"
+    },
+    "./client-enum": {
+      "types": "./lattice.d.ts",
+      "import": "./client-enum.mjs"
+    },
+    "./context": {
+      "types": "./lattice.d.ts",
+      "import": "./context.mjs"
+    },
+    "./dispatcher": {
+      "types": "./lattice.d.ts",
+      "import": "./dispatcher.mjs"
+    },
+    "./timeouts": {
+      "types": "./lattice.d.ts",
+      "import": "./timeouts.mjs"
+    },
+    "./testing": {
+      "types": "./lattice.d.ts",
+      "import": "./testing.mjs"
+    },
+    "./register-builtins": {
+      "types": "./lattice.d.ts",
+      "import": "./register-builtins.mjs"
+    },
+    "./builtins/protection-provider": {
+      "types": "./lattice.d.ts",
+      "import": "./builtins/protection-provider.mjs"
+    },
+    "./builtins/stop-checklist-provider": {
+      "types": "./lattice.d.ts",
+      "import": "./builtins/stop-checklist-provider.mjs"
+    },
+    "./builtins/reminders-provider": {
+      "types": "./lattice.d.ts",
+      "import": "./builtins/reminders-provider.mjs"
+    },
+    "./serena/provider": {
+      "types": "./lattice.d.ts",
+      "import": "./serena/provider.mjs"
+    },
+    "./semble/provider": {
+      "types": "./lattice.d.ts",
+      "import": "./semble/provider.mjs"
+    },
     "./common": "./common.mjs",
     "./session-start": "./session-start.mjs",
     "./provider-registry": "./provider-registry.mjs",
+    "./codex-hook-runner": "./codex-hook-runner.mjs",
     "./pre-tool-policy": "./pre-tool-policy.mjs",
     "./protection": "./protection.mjs",
     "./commit-checkpoint": "./commit-checkpoint.mjs",
@@ -24,23 +81,44 @@
   },
   "files": [
     "*.mjs",
+    "lattice.d.ts",
+    "builtins/",
     "verification/",
     "serena/",
     "semble/",
     "README.md"
   ],
   "scripts": {
+    "prepublishOnly": "pnpm run check && pnpm run typecheck && pnpm test",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "node --check common.mjs && node --check session-start.mjs && node --check provider-registry.mjs && node --check mcp-config-common.mjs && node --check pre-tool-policy.mjs && node --check protection.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check verification/detect-stack.mjs && node --check verification/verify.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/mcp-config-guard.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs && node --check semble/mcp-config-guard.mjs",
+    "check": "node --check index.mjs && node --check common.mjs && node --check session-start.mjs && node --check provider-registry.mjs && node --check codex-hook-runner.mjs && node --check mcp-config-common.mjs && node --check pre-tool-policy.mjs && node --check protection.mjs && node --check commit-checkpoint.mjs && node --check post-tool-reminder.mjs && node --check stop-checklist.mjs && node --check client-enum.mjs && node --check context.mjs && node --check dispatcher.mjs && node --check timeouts.mjs && node --check testing.mjs && node --check register-builtins.mjs && node --check builtins/protection-provider.mjs && node --check builtins/stop-checklist-provider.mjs && node --check builtins/reminders-provider.mjs && node --check verification/detect-stack.mjs && node --check verification/verify.mjs && node --check serena/bootstrap.mjs && node --check serena/dashboard-state.mjs && node --check serena/mcp-config-guard.mjs && node --check serena/start-http.mjs && node --check serena/open-dashboard.mjs && node --check serena/provider.mjs && node --check semble/mcp-config-guard.mjs && node --check semble/provider.mjs",
+    "typecheck": "tsc --noEmit",
     "doctor": "node doctor.mjs"
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@git.example.com/LZong/lattice.git"
+    "url": "git+https://github.com/lzong-tw/lattice.git"
   },
-  "license": "UNLICENSED",
+  "homepage": "https://github.com/lzong-tw/lattice#readme",
+  "bugs": {
+    "url": "https://github.com/lzong-tw/lattice/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "copilot-cli",
+    "codex",
+    "hooks",
+    "agent",
+    "ai",
+    "lifecycle",
+    "guardrails",
+    "provider"
+  ],
+  "license": "MIT",
+  "author": "LZong <lzong.tw@gmail.com>",
   "devDependencies": {
+    "@types/node": "^25.9.1",
     "typescript": "^5.0.0",
     "vitest": "^4.0.0"
   }

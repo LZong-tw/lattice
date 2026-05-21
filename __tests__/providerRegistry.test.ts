@@ -14,7 +14,10 @@ const packageRoot = process.cwd();
 
 function createRegistry(bootstraps: Record<string, ReturnType<typeof vi.fn>>) {
   return Object.fromEntries(
-    Object.entries(bootstraps).map(([name, bootstrap]) => [name, { bootstrap }]),
+    Object.entries(bootstraps).map(([name, bootstrap]) => [
+      name,
+      { bootstrap: bootstrap as unknown as (client: string) => Promise<number> | number },
+    ]),
   );
 }
 

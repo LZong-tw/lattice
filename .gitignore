@@ -9,3 +9,9 @@ node_modules/
 
 # Coverage
 coverage/
+
+# Session-local investigation notes (Phase 0/1 inventory + naming research)
+reports/
+
+# Test state artifacts
+.test-state/

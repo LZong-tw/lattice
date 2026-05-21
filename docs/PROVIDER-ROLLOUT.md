@@ -1,69 +1,25 @@
 # Provider Rollout: `lattice` -> Consumer Repos
 
+> **For the v1 provider API** (definition shape, handlers, merge rules,
+> validators, testing helpers, env-var reservations), see
+> [`PROVIDER-AUTHORING.md`](PROVIDER-AUTHORING.md). **This document covers
+> only the release-and-rollout lifecycle** — how a provider that already
+> exists in `lattice` reaches a consumer repo and gets validated end-to-end.
+
 > **Audience:** Maintainers adding a new provider to `lattice` and consumer repos
 > that need to adopt it afterwards.
 >
 > This document explains the full chain:
 >
-> 1. add a provider inside `lattice`
+> 1. add a provider inside `lattice` (see `PROVIDER-AUTHORING.md` for the API)
 > 2. validate and release the new `lattice` commit
 > 3. update the consumer repo's `hooks/` submodule
 > 4. wire any provider-specific config/env/docs in the consumer repo
 > 5. validate that the consumer repo is actually using the new provider
 
----
-
-## Provider Registry Contract
-
-Provider selection is managed by `provider-registry.mjs` at the package root.
-`session-start.mjs` delegates to `bootstrapProviders(client)` from that module.
-
-### Environment variables
-
-| Variable | Behaviour |
-|----------|-----------|
-| _(none set)_ | Default: activates `["serena"]`. Existing behaviour preserved. |
-| `LATTICE_PROVIDER=<name>` | Activate a single named provider. |
-| `LATTICE_PROVIDERS=<name1>,<name2>` | Activate an ordered list of providers. **Takes precedence over `LATTICE_PROVIDER`.** |
-| `LATTICE_PROVIDER=none` (or `off` / `false` / `0`) | Disable all providers. |
-| `LATTICE_PROVIDERS=none` | Disable all providers. |
-
-Rules:
-- **Default selection stays backward-compatible.** Serena activates by default. If
-  `serena/bootstrap.mjs` is absent or fails to import, the session hook still exits
-  0 — matching the historical fallback in `session-start.mjs`.
-- **Explicit selections fail fast.** If `LATTICE_PROVIDER` or `LATTICE_PROVIDERS` names
-  an unknown provider, the hook exits 1 with a clear error message.
-- Provider names are case-insensitive. Duplicate names are collapsed while preserving
-  the first occurrence.
-- Disable tokens (`none`, `off`, `false`, `0`) are case-insensitive. A list made up
-  entirely of disable tokens resolves to `[]`; mixed lists keep the real providers.
-- Selected providers run in the order listed and stop on the first non-zero exit code.
-
-### Adding a new provider (copy-paste ready)
-
-1. Create `<provider-name>/bootstrap.mjs` with a named export matching the pattern.
-2. Register it in `providerRegistry` inside `provider-registry.mjs`:
-
-```js
-"mcp-local-rag": {
-  name: "mcp-local-rag",
-  async bootstrap(client) {
-    const { bootstrapMcpLocalRag } = await import("./mcp-local-rag/bootstrap.mjs");
-    return bootstrapMcpLocalRag(client);
-  },
-},
-```
-
-3. Expose it in `package.json` exports:
-
-```json
-"./mcp-local-rag/bootstrap": "./mcp-local-rag/bootstrap.mjs"
-```
-
-4. Add `mcp-local-rag/bootstrap.mjs` to the `entryPoints` array in `doctor.mjs`
-   and to the `check` script in `package.json`.
-5. Run `pnpm run doctor && pnpm test && pnpm run check` before committing.
+For the canonical list of `LATTICE_*` env vars (selection, timeouts, built-in
+provider settings), see `PROVIDER-AUTHORING.md` § "Reserved env vars". A short
+summary lives in `README.md` § "Provider Integration".
 
 ---
 
@@ -72,7 +28,7 @@ Rules:
 The general hook layer and the provider layer live in different places:
 
 - `lattice` owns the shared hook runtime and provider implementations
-- a consumer repo such as `example-consumer` owns the repo-specific config, env,
+- a consumer repo such as `consumer-repo` owns the repo-specific config, env,
   and operational docs
 
 That means adding a provider is never a one-file change. To make a new provider
@@ -100,11 +56,12 @@ provider.
 
 Before adding a new provider, keep these invariants intact:
 
-1. The `hooks/` mount path stays stable.
+1. The `hooks/` mount path (the consumer-side mount) stays stable.
 2. Shared hook logic remains provider-agnostic.
-3. Provider logic lives under `hooks/<provider>/`.
+3. Provider logic lives under `<provider>/` inside the `lattice` repo
+   (which the consumer sees as `hooks/<provider>/` once mounted).
 4. Provider setup stays optional; the shared hook layer must still work without
-   that provider.
+   any single provider — consumers can opt out via `LATTICE_DISABLE=<name>`.
 5. Consumer repos only receive the new provider after they update the `hooks/`
    submodule to a commit that contains it.
 
@@ -112,57 +69,30 @@ Before adding a new provider, keep these invariants intact:
 
 ## Phase 1 - Add the Provider in `lattice`
 
-Create a provider directory under the hook root:
-
-```text
-hooks/<provider>/
-```
-
-Typical files:
+Build the provider against the v1 contract documented in
+[`PROVIDER-AUTHORING.md`](PROVIDER-AUTHORING.md). For an in-tree built-in,
+the conventional shape is:
 
 | File | Purpose |
 |------|---------|
-| `hooks/<provider>/bootstrap.mjs` | Entry point called from `session-start.mjs` or a provider registry |
-| `hooks/<provider>/start-*.mjs` / `*.sh` | Launch or transport helpers |
-| `hooks/<provider>/state-*.mjs` | Runtime state helpers, logs, PID tracking, URLs |
-| `hooks/<provider>/README` or doc entry | Provider-specific setup and troubleshooting |
+| `<provider>/provider.mjs` | The `LatticeProvider` definition (handlers, optional `validate`, `supportedClients`). |
+| `<provider>/*` | Any helpers the provider needs (launchers, state, MCP guards, etc.). |
+| `register-builtins.mjs` | Add a `registerProvider(<yourProvider>)` line so it self-registers on import. |
+| `package.json` `exports` | Add a `./<provider>/provider` subpath so consumers can import the definition directly. |
+| `package.json` `check` script + `doctor.mjs` `entryPoints` | Add the new files so `pnpm run check` and `pnpm run doctor` exercise them. |
+| Provider-specific doc | Operator-facing setup and troubleshooting (see `docs/SERENA-CLIENT-SETUP.md` for the shape). |
 
 ### Keep the shared layer clean
 
-Do not bury provider-specific assumptions in `common.mjs`, `pre-tool-policy.mjs`,
-or other shared entry points unless they are truly generic.
+Do not bury provider-specific assumptions in `common.mjs`,
+`pre-tool-policy.mjs`, or other shared entry points unless they are truly
+generic.
 
-Good pattern:
+Good pattern: the provider self-contains its logic under `<provider>/` and
+the dispatcher fans events out via `register-builtins.mjs`.
 
-```text
-session-start.mjs
-  -> provider bootstrap selection
-  -> hooks/<provider>/bootstrap.mjs
-```
-
-Bad pattern:
-
-```text
-common.mjs
-  -> hard-coded provider-specific branches
-  -> consumer repo assumptions
-```
-
-### If you are adding a second provider
-
-Today `lattice` ships Serena as the current provider. If you add another
-provider such as `mcp-local-rag`, do not rely on "the provider" still meaning a
-single thing forever.
-
-Before rollout, make provider selection explicit in `lattice`, for example via:
-
-- a provider registry
-- an enable-list
-- a documented environment variable contract
-- per-client bootstrap selection logic
-
-Without an explicit selection contract, a second provider will be hard to roll
-out safely across consumer repos.
+Bad pattern: hard-coded provider-specific branches inside shared entry points
+or `common.mjs`.
 
 ---
 
@@ -210,7 +140,7 @@ use it yet.
 
 ## Phase 4 - Update the Consumer Repo
 
-In a consumer repo such as `example-consumer`, update the `hooks/` submodule to the
+In a consumer repo such as `consumer-repo`, update the `hooks/` submodule to the
 new `lattice` commit:
 
 ```bash
@@ -257,14 +187,12 @@ consumer checks:
 
 ```bash
 cd /path/to/consumer-repo
-node scripts/validate-lattice-linkage.mjs
 cd hooks && pnpm run doctor && cd ..
 git --no-pager diff --check
 ```
 
 Expected result:
 
-- `lattice linkage OK`
 - `doctor: all checks passed`
 - `git diff --check` prints nothing
 
@@ -284,32 +212,31 @@ If the provider needs consumer env/config, validate those exact surfaces too.
 
 If you add `mcp-local-rag` later, the clean rollout path is:
 
-1. In `lattice`, add `hooks/mcp-local-rag/`
-   - bootstrap entry point
-   - launch helpers
-   - state helpers if needed
-   - provider doc
-2. Make provider selection explicit if Serena and `mcp-local-rag` can both exist.
+1. In `lattice`, add `mcp-local-rag/provider.mjs` (the v1 `LatticeProvider`
+   definition — see [`PROVIDER-AUTHORING.md`](PROVIDER-AUTHORING.md)), any
+   helpers it needs (launcher, state, MCP guard), and a provider doc.
+2. Add `registerProvider(mcpLocalRagProvider)` to `register-builtins.mjs`
+   so the dispatcher picks it up. Built-ins activate by default; consumers
+   opt out via `LATTICE_DISABLE=mcp-local-rag`.
 3. Validate in `lattice` with:
    - `pnpm run doctor`
    - `pnpm test`
    - `pnpm run check`
    - provider-specific smoke test
 4. Commit and push the new `lattice` SHA.
-5. In `example-consumer`, update the `hooks/` submodule to that SHA.
+5. In `consumer-repo`, update the `hooks/` submodule to that SHA.
 6. Add or adjust any consumer repo surfaces needed by `mcp-local-rag`, such as:
    - `.mcp.json`
    - `.codex/config.toml`
    - Copilot user MCP config
    - `.env.example` / env templates if the provider needs new settings
-7. Update `example-consumer` docs to explain how to enable and validate
+7. Update `consumer-repo` docs to explain how to enable and validate
    `mcp-local-rag`.
 8. Run:
-   - `node scripts/validate-lattice-linkage.mjs`
    - `cd hooks && pnpm run doctor`
    - provider-specific smoke tests
 
-Only after steps 5-8 does `example-consumer` actually "enjoy" the new provider.
+Only after steps 5-8 does `consumer-repo` actually "enjoy" the new provider.
 
 ---
 

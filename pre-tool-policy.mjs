@@ -1,47 +1,23 @@
 #!/usr/bin/env node
-import {
-  isBashTool,
-  isEditTool,
-  isGitCommitCommand,
-  isScreenshotTool,
-  messages,
-  normalizeToolUse,
-  printClaudeOrCodexDeny,
-  printCopilotDeny,
-  printMessage,
-  readJsonStdin,
-} from "./common.mjs";
-import { maybePrintCommitCheckpointReminder } from "./commit-checkpoint.mjs";
-import { getProtectedFileEditFailure } from "./protection.mjs";
+/**
+ * pre-tool-policy.mjs — PreToolUse hook entry point.
+ *
+ * Delegates to the dispatcher. File protection, commit-gate denial,
+ * commit-checkpoint reminders, and screenshot reminders are now
+ * implemented by built-in providers (see register-builtins.mjs).
+ */
+
+import { readJsonStdin } from "./common.mjs";
+import { dispatch, EVENT_NAMES } from "./dispatcher.mjs";
+import "./register-builtins.mjs";
 
 const client = process.argv[2];
 const payload = await readJsonStdin();
-const { toolName, command, filePaths } = normalizeToolUse(client, payload);
 
-if (isEditTool(toolName)) {
-  const reason = getProtectedFileEditFailure(filePaths);
-  if (reason) {
-    if (client === "copilot") {
-      printCopilotDeny(reason);
-    } else {
-      printClaudeOrCodexDeny(reason);
-    }
-    process.exit(0);
-  }
+try {
+  process.exit(await dispatch(EVENT_NAMES.PreToolUse, payload, { client }));
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`lattice: PreToolUse dispatch error: ${message}\n`);
+  process.exit(1);
 }
-
-if (client === "claude" && isScreenshotTool(toolName)) {
-  printMessage(messages.screenshotReminder);
-}
-
-if (!isBashTool(toolName) || !isGitCommitCommand(command)) {
-  maybePrintCommitCheckpointReminder();
-  process.exit(0);
-}
-
-if (client === "copilot") {
-  printCopilotDeny(messages.commitGate);
-  process.exit(0);
-}
-
-printClaudeOrCodexDeny(messages.commitGate);

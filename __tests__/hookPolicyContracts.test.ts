@@ -1,6 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
@@ -8,7 +15,12 @@ import { validateRequiredSerenaMcpConfig } from "../serena/mcp-config-guard.mjs"
 import { validateRequiredSembleMcpConfig } from "../semble/mcp-config-guard.mjs";
 
 const packageRoot = process.cwd();
+const repoRoot = resolve(packageRoot, "..");
 const node = process.execPath;
+
+function codexDispatcherCommand(target: "session-start.mjs" | "pre-tool-policy.mjs") {
+  return `LATTICE_HOOK_TARGET=${target} LATTICE_HOOK_CLIENT=codex node --input-type=module -e "import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})"`;
+}
 
 function runHook(
   scriptName: string,
@@ -42,8 +54,8 @@ const consumerConfigFixtures = {
     preToolUse: "node ./hooks/pre-tool-policy.mjs copilot",
   },
   codex: {
-    sessionStart: 'node "$(git rev-parse --show-toplevel)/hooks/session-start.mjs" codex',
-    preToolUse: 'node "$(git rev-parse --show-toplevel)/hooks/pre-tool-policy.mjs" codex',
+    sessionStart: "hooks/codex-hook-runner.mjs session-start.mjs codex",
+    preToolUse: "hooks/codex-hook-runner.mjs pre-tool-policy.mjs codex",
   },
 } as const;
 
@@ -57,12 +69,51 @@ describe("consumer path contract", () => {
     expect(consumerConfigFixtures.copilot.sessionStart).toContain("hooks/session-start.mjs");
     expect(consumerConfigFixtures.copilot.preToolUse).toContain("hooks/pre-tool-policy.mjs");
 
-    expect(consumerConfigFixtures.codex.sessionStart).toContain("hooks/session-start.mjs");
-    expect(consumerConfigFixtures.codex.preToolUse).toContain("hooks/pre-tool-policy.mjs");
+    expect(consumerConfigFixtures.codex.sessionStart).toContain("hooks/codex-hook-runner.mjs");
+    expect(consumerConfigFixtures.codex.sessionStart).toContain("session-start.mjs");
+    expect(consumerConfigFixtures.codex.preToolUse).toContain("hooks/codex-hook-runner.mjs");
+    expect(consumerConfigFixtures.codex.preToolUse).toContain("pre-tool-policy.mjs");
   });
 });
 
 describe("hook entry-point behavior", () => {
+  // Codex Windows path uses a different dispatcher; not yet covered. See cross-platform review 2026-05-21.
+  it.skipIf(process.platform === "win32")("dispatches Codex project hooks from payload cwd instead of shell cwd", () => {
+    const consumerRoot = mkdtempSync(join(tmpdir(), "lattice-codex-consumer-"));
+    symlinkSync(packageRoot, join(consumerRoot, "hooks"), "dir");
+    const consumerConfigPath = resolve(repoRoot, ".codex/hooks.json");
+    const command = existsSync(consumerConfigPath)
+      ? JSON.parse(readFileSync(consumerConfigPath, "utf8")).hooks.PreToolUse[0].hooks[0].command
+      : codexDispatcherCommand("pre-tool-policy.mjs");
+
+    expect(command).toContain("codex-hook-runner.mjs");
+    expect(command).not.toContain("rev-parse --show-toplevel");
+
+    const result = spawnSync("sh", ["-lc", command], {
+      input: JSON.stringify({
+        cwd: consumerRoot,
+        tool_name: "Bash",
+        tool_input: { command: "git commit -m test" },
+      }),
+      encoding: "utf8",
+      cwd: dirname(consumerRoot),
+    });
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(
+      expect.objectContaining({
+        hookSpecificOutput: expect.objectContaining({
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+        }),
+      }),
+    );
+  });
+
   it("denies shell git commit for Copilot JSON hooks", () => {
     const result = runHook("pre-tool-policy.mjs", "copilot", {
       toolName: "bash",
@@ -165,14 +216,18 @@ describe("hook entry-point behavior", () => {
     expect(result.stdout).toBe("");
   });
 
-  it("wires the commit checkpoint reminder through the shared entry points", () => {
+  it("wires the commit checkpoint reminder through the builtins registry", () => {
     const sessionStartSource = readFileSync(resolve(packageRoot, "session-start.mjs"), "utf8");
     const preToolSource = readFileSync(resolve(packageRoot, "pre-tool-policy.mjs"), "utf8");
+    const registerSource = readFileSync(resolve(packageRoot, "register-builtins.mjs"), "utf8");
 
-    expect(sessionStartSource).toContain("commit-checkpoint.mjs");
-    expect(sessionStartSource).toContain("maybePrintCommitCheckpointReminder");
-    expect(preToolSource).toContain("commit-checkpoint.mjs");
-    expect(preToolSource).toContain("maybePrintCommitCheckpointReminder");
+    // Entry points pull the providers in via the side-effect register module.
+    expect(sessionStartSource).toContain("register-builtins.mjs");
+    expect(preToolSource).toContain("register-builtins.mjs");
+    // register-builtins must register the commit checkpoint provider so
+    // both SessionStart and PreToolUse handlers fire.
+    expect(registerSource).toContain("commitCheckpointProvider");
+    expect(registerSource).toContain("registerProvider(commitCheckpointProvider)");
   });
 
   it("prints a resume recovery checklist for resume sessions", () => {
@@ -204,12 +259,33 @@ describe("Serena provider contracts", () => {
     },
   );
 
-  it("session-start delegates provider bootstrap to provider-registry.mjs", () => {
-    const source = readFileSync(resolve(packageRoot, "session-start.mjs"), "utf8");
-    expect(source).toContain("./provider-registry.mjs");
-    expect(source).toContain("bootstrapProviders");
-    expect(source).toContain("LATTICE_REQUIRE_SERENA_MCP");
-    expect(source).toContain("LATTICE_REQUIRE_SEMBLE_MCP");
+  it("session-start delegates to the v1 dispatcher with built-in providers", () => {
+    const sessionStartSource = readFileSync(
+      resolve(packageRoot, "session-start.mjs"),
+      "utf8",
+    );
+    const registerSource = readFileSync(
+      resolve(packageRoot, "register-builtins.mjs"),
+      "utf8",
+    );
+    const serenaProviderSource = readFileSync(
+      resolve(packageRoot, "serena/provider.mjs"),
+      "utf8",
+    );
+    const sembleProviderSource = readFileSync(
+      resolve(packageRoot, "semble/provider.mjs"),
+      "utf8",
+    );
+
+    // Entry point uses dispatch + register-builtins; legacy
+    // bootstrapProviders / LATTICE_REQUIRE_*_MCP env handling have moved
+    // into the provider definitions.
+    expect(sessionStartSource).toContain("dispatch(EVENT_NAMES.SessionStart");
+    expect(sessionStartSource).toContain("register-builtins.mjs");
+    expect(registerSource).toContain("registerProvider(serenaProvider)");
+    expect(registerSource).toContain("registerProvider(sembleProvider)");
+    expect(serenaProviderSource).toContain("LATTICE_REQUIRE_SERENA_MCP");
+    expect(sembleProviderSource).toContain("LATTICE_REQUIRE_SEMBLE_MCP");
   });
 
   it("provider-registry.mjs wires Serena as the default provider", () => {

@@ -1,10 +1,14 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { detectProjectStack } from "../verification/detect-stack.mjs";
-import { filterRelevantOutput, parseGitStatusFiles } from "../verification/verify.mjs";
+import {
+  filterRelevantOutput,
+  parseGitStatusFiles,
+  runProjectVerification,
+} from "../verification/verify.mjs";
 
 describe("verification profile", () => {
   it("detects JavaScript package manager lockfiles and scripts", () => {
@@ -54,5 +58,80 @@ describe("verification profile", () => {
     expect(filterRelevantOutput(output, ["src/changed.ts"])).toBe(
       "src/changed.ts(1,1): error TS1000: broken",
     );
+  });
+});
+
+describe("runProjectVerification — payload.cwd clamping (H3)", () => {
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  const captured: string[] = [];
+  let originalLatticeRepoRoot: string | undefined;
+
+  beforeEach(() => {
+    captured.length = 0;
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+      captured.push(String(chunk));
+      return true;
+    });
+    originalLatticeRepoRoot = process.env.LATTICE_REPO_ROOT;
+  });
+
+  afterEach(() => {
+    stderrSpy.mockRestore();
+    if (originalLatticeRepoRoot === undefined) {
+      delete process.env.LATTICE_REPO_ROOT;
+    } else {
+      process.env.LATTICE_REPO_ROOT = originalLatticeRepoRoot;
+    }
+  });
+
+  it("ignores payload.cwd that points outside repoRoot when LATTICE_REPO_ROOT is set", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "lattice-verify-root-"));
+    const attacker = mkdtempSync(join(tmpdir(), "lattice-verify-attacker-"));
+    const stateHome = mkdtempSync(join(tmpdir(), "lattice-verify-state-"));
+    process.env.LATTICE_REPO_ROOT = repoRoot;
+
+    const result = runProjectVerification({
+      payload: { cwd: attacker },
+      root: repoRoot,
+      stateHome,
+    });
+
+    // No package.json in repoRoot either, so status is "skipped".
+    expect(result.status).toBe("skipped");
+    expect(captured.join("")).toMatch(/ignoring payload\.cwd/);
+    expect(captured.join("")).toContain(attacker);
+  });
+
+  it("accepts payload.cwd that is a descendant of repoRoot when LATTICE_REPO_ROOT is set", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "lattice-verify-root-"));
+    mkdirSync(join(repoRoot, "sub"), { recursive: true });
+    const stateHome = mkdtempSync(join(tmpdir(), "lattice-verify-state-"));
+    process.env.LATTICE_REPO_ROOT = repoRoot;
+
+    const result = runProjectVerification({
+      payload: { cwd: join(repoRoot, "sub") },
+      root: repoRoot,
+      stateHome,
+    });
+
+    expect(result.status).toBe("skipped");
+    expect(captured.join("")).not.toMatch(/ignoring payload\.cwd/);
+  });
+
+  it("trusts payload.cwd verbatim when LATTICE_REPO_ROOT is unset", () => {
+    delete process.env.LATTICE_REPO_ROOT;
+    const repoRoot = mkdtempSync(join(tmpdir(), "lattice-verify-root-"));
+    const elsewhere = mkdtempSync(join(tmpdir(), "lattice-verify-other-"));
+    const stateHome = mkdtempSync(join(tmpdir(), "lattice-verify-state-"));
+
+    const result = runProjectVerification({
+      payload: { cwd: elsewhere },
+      root: repoRoot,
+      stateHome,
+    });
+
+    // No project in `elsewhere` → skipped, no clamping warning.
+    expect(result.status).toBe("skipped");
+    expect(captured.join("")).not.toMatch(/ignoring payload\.cwd/);
   });
 });

@@ -27,11 +27,32 @@ function isProjectWrapperArg(arg, root) {
   return isProjectScriptArg(arg, root, path.join("scripts", "serena-mcp.mjs"));
 }
 
+const SERENA_UPSTREAM_PREFIX = "git+https://github.com/oraios/serena";
+
+/**
+ * Accept the bare upstream URL, an `@<tag-or-branch>` pin, or a
+ * `#<sha-or-ref>` pin. The pin portion is opaque — users own what
+ * ref they want to pull.
+ */
+function isSerenaUpstreamArg(arg) {
+  if (typeof arg !== "string") return false;
+  if (arg === SERENA_UPSTREAM_PREFIX) return true;
+  if (arg.startsWith(`${SERENA_UPSTREAM_PREFIX}@`) && arg.length > SERENA_UPSTREAM_PREFIX.length + 1) {
+    return true;
+  }
+  if (arg.startsWith(`${SERENA_UPSTREAM_PREFIX}#`) && arg.length > SERENA_UPSTREAM_PREFIX.length + 1) {
+    return true;
+  }
+  return false;
+}
+
 function validateDirectUvxEntry(args, expectedContext, root, label) {
   const failures = [];
 
-  if (!hasArg(args, "git+https://github.com/oraios/serena")) {
-    failures.push(`${label} args must pin Serena via git+https://github.com/oraios/serena.`);
+  if (!args.some(isSerenaUpstreamArg)) {
+    failures.push(
+      `${label} args must pin Serena via ${SERENA_UPSTREAM_PREFIX} (optionally with @<tag> or #<sha>).`,
+    );
   }
 
   if (!hasArg(args, "serena") || !hasArg(args, "start-mcp-server")) {

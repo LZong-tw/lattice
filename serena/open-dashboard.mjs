@@ -2,6 +2,7 @@
 import { spawnSync } from "node:child_process";
 
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   getDashboardOpenPlan,
   getClientPaths,
@@ -15,6 +16,9 @@ import {
   readPidFile,
   wait,
 } from "./dashboard-state.mjs";
+
+const serenaDir = path.dirname(fileURLToPath(import.meta.url));
+const startHttpScript = path.join(serenaDir, "start-http.mjs");
 
 function printUsage() {
   console.error(
@@ -81,8 +85,10 @@ if (normalizedRequestedClient) {
   const portListening = pidAlive ? true : await isPortListening(paths.port);
 
   if (!pidAlive && !portListening) {
-    const launcherResult = spawnSync("bash", [paths.launcherPath], {
-      cwd: path.dirname(paths.launcherPath),
+    // Spawn `node start-http.mjs <client>` directly instead of the .sh
+    // wrapper so Windows (no bash on PATH) works the same as macOS/Linux.
+    const launcherResult = spawnSync(process.execPath, [startHttpScript, paths.client], {
+      cwd: serenaDir,
       stdio: "inherit",
     });
 

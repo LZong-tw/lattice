@@ -11,7 +11,11 @@ function isEnvFile(fileName) {
 }
 
 function isGitPath(filePath) {
-  return filePath.split(path.sep).some((segment) => segment === ".git");
+  // Match `.git` segment using both separators so forward-slash payloads on
+  // Windows (Claude/Codex hooks frequently emit "/"-style paths even on
+  // win32) cannot bypass the guard. Case-insensitive because Windows and
+  // macOS default filesystems are case-insensitive.
+  return filePath.split(/[\\/]/).some((segment) => segment.toLowerCase() === ".git");
 }
 
 function resolveCandidate(filePath, root) {

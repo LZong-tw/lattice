@@ -279,6 +279,13 @@ export function getDashboardOpenPlan({ platform = process.platform, forceBrowser
   };
 }
 
+/**
+ * @param {string} url
+ * @param {{
+ *   platform?: NodeJS.Platform,
+ *   runner?: (command: string, args: string[], opts?: { stdio?: string }) => { status?: number | null, error?: Error }
+ * }} [opts]
+ */
 export function openExternalUrl(url, { platform = process.platform, runner = spawnSync } = {}) {
   let command = "xdg-open";
   let args = [url];

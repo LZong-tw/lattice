@@ -17,9 +17,37 @@ function resolveRepoRoot() {
 export const hooksRoot = __dirname;
 export const repoRoot = resolveRepoRoot();
 
+/**
+ * Resolve the per-repo state namespace used to scope on-disk caches
+ * (verification counters, checkpoint timestamps, dashboard state).
+ *
+ * If LATTICE_STATE_NAMESPACE is set, sanitize it down to a single safe
+ * path segment — the env value is otherwise an attacker-controlled
+ * traversal sink (`../../etc`, absolute paths, null bytes all escape
+ * the intended state root via `path.join`).
+ */
 export function getStateNamespace(root = repoRoot) {
   const override = process.env.LATTICE_STATE_NAMESPACE?.trim();
-  return override || path.basename(root);
+  if (!override) {
+    return path.basename(root);
+  }
+
+  // Reject anything containing path separators, null bytes, or `..`
+  // segments — these are the traversal vectors. Sanitize remaining
+  // unsafe chars to `_` so the namespace can never resolve outside
+  // its intended root when joined into a path.
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00\\/]/.test(override)) {
+    throw new Error("lattice: LATTICE_STATE_NAMESPACE must not contain path separators or null bytes");
+  }
+  if (override === "." || override === "..") {
+    throw new Error("lattice: LATTICE_STATE_NAMESPACE must not be '.' or '..'");
+  }
+  const sanitized = override.replace(/[^A-Za-z0-9_.@-]/g, "_");
+  if (sanitized.length === 0) {
+    throw new Error("lattice: LATTICE_STATE_NAMESPACE sanitized to empty string");
+  }
+  return sanitized;
 }
 
 export const messages = {
