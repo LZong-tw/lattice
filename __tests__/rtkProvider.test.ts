@@ -70,16 +70,22 @@ describe("rtkProvider.validate", () => {
     }
   });
 
-  it("passes when required rtk is available", async () => {
-    const { ctx, dispose } = mockContext({
-      env: { LATTICE_REQUIRE_RTK: "1", LATTICE_RTK_BIN: fakeRtk },
-    });
-    try {
-      await expect(rtkProvider.validate!(ctx)).resolves.toEqual({ ok: true });
-    } finally {
-      dispose();
-    }
-  });
+  // Skipped on Windows: the fake rtk is a bash shebang script that
+  // execFile cannot launch without an interpreter. The production code
+  // would work fine against a real Windows rtk.exe.
+  it.skipIf(process.platform === "win32")(
+    "passes when required rtk is available",
+    async () => {
+      const { ctx, dispose } = mockContext({
+        env: { LATTICE_REQUIRE_RTK: "1", LATTICE_RTK_BIN: fakeRtk },
+      });
+      try {
+        await expect(rtkProvider.validate!(ctx)).resolves.toEqual({ ok: true });
+      } finally {
+        dispose();
+      }
+    },
+  );
 
   it("fails when required rtk is missing", async () => {
     const { ctx, dispose } = mockContext({
@@ -98,24 +104,29 @@ describe("rtkProvider.validate", () => {
 });
 
 describe("rtkProvider.PreToolUse", () => {
-  it("rewrites Bash commands when rtk returns a different command", async () => {
-    const { result } = await runProvider(
-      rtkProvider,
-      "PreToolUse",
-      mockPayload.preToolUse({
-        tool_name: "Bash",
-        tool_input: { command: "git status" },
-      }),
-      { contextOverrides: { env: { LATTICE_RTK_BIN: fakeRtk } } },
-    );
+  // Skipped on Windows for the same reason as above: the fake rtk is a
+  // bash shebang script that cannot be launched directly via execFile.
+  it.skipIf(process.platform === "win32")(
+    "rewrites Bash commands when rtk returns a different command",
+    async () => {
+      const { result } = await runProvider(
+        rtkProvider,
+        "PreToolUse",
+        mockPayload.preToolUse({
+          tool_name: "Bash",
+          tool_input: { command: "git status" },
+        }),
+        { contextOverrides: { env: { LATTICE_RTK_BIN: fakeRtk } } },
+      );
 
-    expect(result).toEqual({
-      decision: "allow",
-      hookSpecificOutput: {
-        updatedInput: { command: "rtk git status" },
-      },
-    });
-  });
+      expect(result).toEqual({
+        decision: "allow",
+        hookSpecificOutput: {
+          updatedInput: { command: "rtk git status" },
+        },
+      });
+    },
+  );
 
   it("does nothing when rtk returns the original command", async () => {
     const { result } = await runProvider(
