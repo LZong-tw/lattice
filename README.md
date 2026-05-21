@@ -4,24 +4,6 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](#prerequisites)
 
-## Install
-
-```bash
-# In your consumer repo:
-pnpm add @lattice/core            # or: npm install @lattice/core / yarn add @lattice/core
-
-# Mount the hook scripts at the stable `hooks/` path your client configs point at:
-mkdir -p hooks
-node -e "import('node:fs').then(({cpSync})=>cpSync('node_modules/@lattice/core','hooks',{recursive:true}))"
-
-# Validate:
-node --check hooks/session-start.mjs && echo OK
-```
-
-Prefer a git submodule? See [Consumer Setup](#consumer-setup) below.
-
----
-
 `lattice` is a repo-scoped AI client runtime layer: shared hook entry points,
 policy gates, lifecycle reminders, and provider integrations for
 **Claude Code**, **GitHub Copilot CLI**, and **Codex CLI**.
@@ -40,11 +22,195 @@ packages or live in-tree under `builtins/`, `serena/`, and `semble/`.
 
 ---
 
-## LLM Quick-Reference
+## Agent Start Here
 
-> **If you are an LLM agent**: follow this doc top-to-bottom. Every command is
-> copy-paste ready. Expected output is shown in `# =>` comments. If any step
-> fails, jump to [Troubleshooting](#troubleshooting).
+This section is the install contract for LLM agents and humans. If you are
+installing lattice into another repo, follow the phases in order and stop only
+after [One-Screen Done Check](#one-screen-done-check) passes.
+
+If you are editing lattice itself, skip to [Developer Setup](#developer-setup-editing-lattice-itself).
+
+### Phase 0 — Declare Inputs
+
+Run these from the consumer repo. Replace `LATTICE_REPO_URL` with the real
+repository URL if you use the submodule path.
+
+```bash
+export CONSUMER_REPO="$(pwd)"
+export LATTICE_REPO_URL="<lattice-repo-url>"
+test -d "$CONSUMER_REPO/.git" && echo "consumer repo: $CONSUMER_REPO"
+# => consumer repo: /path/to/consumer
+```
+
+### Phase 1 — Check Prerequisites
+
+```bash
+node --version
+# => v18.x.x or higher
+
+git --version
+# => git version 2.x.x or higher
+```
+
+Optional providers need extra CLIs:
+
+```bash
+uvx --version
+# => required only for Serena/Semble MCP startup commands
+
+rtk --version
+# => required only when LATTICE_REQUIRE_RTK=1
+```
+
+### Phase 2 — Mount lattice at `hooks/`
+
+Choose exactly one mount strategy. Do not use both in the same consumer repo.
+
+**Option A: git submodule (recommended for shared project repos)**
+
+```bash
+cd "$CONSUMER_REPO"
+git submodule add "$LATTICE_REPO_URL" hooks
+git submodule update --init --recursive
+```
+
+**Option B: package copy (recommended for local/private experiments)**
+
+```bash
+cd "$CONSUMER_REPO"
+pnpm add @lattice/core
+mkdir -p hooks
+node -e "import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lattice/core','hooks',{recursive:true})})"
+```
+
+The consumer path must be exactly `hooks/`. Client configs below depend on
+that stable path.
+
+### Phase 3 — Verify the Mount
+
+```bash
+cd "$CONSUMER_REPO"
+ls hooks/common.mjs hooks/session-start.mjs hooks/codex-hook-runner.mjs hooks/pre-tool-policy.mjs
+# => all four files are listed
+
+node --check hooks/common.mjs
+node --check hooks/session-start.mjs
+node --check hooks/codex-hook-runner.mjs
+node --check hooks/pre-tool-policy.mjs
+# => each command exits 0
+```
+
+If any command fails, re-run Phase 2 before editing client config.
+
+### Phase 4 — Wire the AI Client
+
+Pick every client that must work in this consumer repo.
+
+| Client | Required files to create or update | Exact config section |
+|--------|------------------------------------|----------------------|
+| Claude Code | `.claude/settings.json` | [Claude Code Config](#claude-code-config) |
+| Codex CLI | `.codex/config.toml` and `.codex/hooks.json` | [Codex CLI Config](#codex-cli-config) |
+| GitHub Copilot CLI | `.github/hooks/repo-guardrails.json` | [GitHub Copilot CLI Config](#github-copilot-cli-config) |
+
+Do not invent hook paths. Use the commands exactly as shown in the matching
+section. In particular, Codex must use `hooks/codex-hook-runner.mjs`; do not
+use `$(git rev-parse --show-toplevel)` inside Codex hook commands.
+
+### Phase 5 — Add Optional Providers
+
+Only enable required providers. The hook layer works without them.
+
+| Provider | When to enable | Required setup |
+|----------|----------------|----------------|
+| Serena | You want startup-time Serena MCP lifecycle and dashboard checks | Follow [docs/SERENA-CLIENT-SETUP.md](docs/SERENA-CLIENT-SETUP.md), then set `LATTICE_REQUIRE_SERENA_MCP=1` only after MCP config exists. |
+| Semble | You want code-search MCP available at startup | Add a stdio `semble` MCP entry to Claude/Codex config, then set `LATTICE_REQUIRE_SEMBLE_MCP=1` only after config exists. |
+| RTK | You want Bash command output rewritten through `rtk rewrite` | Install `rtk`; leave fail-open by default, or set `LATTICE_REQUIRE_RTK=1` only when missing RTK should block startup. |
+
+Reference docs:
+
+- [docs/SERENA-CLIENT-SETUP.md](docs/SERENA-CLIENT-SETUP.md) — Serena MCP for Claude Code and Codex.
+- [docs/PROVIDER-ROLLOUT.md](docs/PROVIDER-ROLLOUT.md) — rollout order for provider changes.
+- [docs/PROVIDER-AUTHORING.md](docs/PROVIDER-AUTHORING.md) — writing new lattice providers.
+
+### Phase 6 — Smoke Test Before Commit
+
+Run the shared smoke tests from the consumer repo:
+
+```bash
+cd "$CONSUMER_REPO"
+printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude; echo "exit: $?"
+# => exit: 0
+
+printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs codex; echo "exit: $?"
+# => exit: 0
+
+echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs claude
+# => stdout contains "permissionDecision":"deny"
+
+echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs codex
+# => stdout contains "permissionDecision":"deny"
+```
+
+For Copilot-only repos, run the same PreToolUse smoke test with `copilot`.
+
+### One-Screen Done Check
+
+Consumer setup is complete only when all applicable checks pass:
+
+```bash
+cd "$CONSUMER_REPO"
+test -f hooks/common.mjs
+node --check hooks/common.mjs
+node --check hooks/session-start.mjs
+node --check hooks/codex-hook-runner.mjs
+node --check hooks/pre-tool-policy.mjs
+printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude
+printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs codex
+echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs claude | grep '"permissionDecision":"deny"'
+echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs codex | grep '"permissionDecision":"deny"'
+```
+
+Then confirm each client-specific file exists:
+
+```bash
+test -f .claude/settings.json        # if using Claude Code
+test -f .codex/config.toml           # if using Codex
+test -f .codex/hooks.json            # if using Codex
+test -f .github/hooks/repo-guardrails.json  # if using Copilot CLI
+```
+
+Optional provider done checks:
+
+```bash
+curl -sf http://127.0.0.1:<serena-port>/mcp  # if Serena is required
+rg '"semble"|\\bsemble\\b' .mcp.json .codex/config.toml  # if Semble is required
+rtk --version  # if LATTICE_REQUIRE_RTK=1
+```
+
+### LLM Operating Rules
+
+- Follow this README in order. Do not skip ahead to provider setup before the
+  shared `hooks/` smoke tests pass.
+- Treat `hooks/` as a hard compatibility contract. All consumer config snippets
+  are written against that path.
+- Prefer project-scoped config files over global config so everyone in the
+  project gets the same behavior.
+- For Codex, use `[features].hooks = true`. Do not use deprecated
+  `[features].codex_hooks`.
+- If a `PreToolUse` hook exits 1, reproduce it with the exact smoke command
+  above and isolate the shared layer with `LATTICE_PROVIDER=none`.
+- If a `PostCompact` hook is added by a provider, it must write valid JSON to
+  stdout. Empty stdout is invalid; output `{}` when there is no update.
+- Do not set `LATTICE_REQUIRE_SERENA_MCP`, `LATTICE_REQUIRE_SEMBLE_MCP`, or
+  `LATTICE_REQUIRE_RTK` until the corresponding client/provider config has been
+  installed and smoke-tested.
+
+---
+
+## Install
+
+For consumer repos, use [Agent Start Here](#agent-start-here). The rest of this
+README is reference material and exact client config.
 
 ---
 
@@ -701,6 +867,78 @@ Tests cover:
 
 ## Troubleshooting
 
+### `PreToolUse hook exited with code 1`
+
+**Cause:** the client can execute the hook, but a provider or policy gate is
+returning a blocking failure.
+
+```bash
+# First isolate the shared hook layer:
+echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
+  | env LATTICE_PROVIDER=none node hooks/pre-tool-policy.mjs claude
+# => Should exit 0
+
+echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
+  | env LATTICE_PROVIDER=none node hooks/pre-tool-policy.mjs codex
+# => Should exit 0
+```
+
+If the isolated command passes, re-enable providers one at a time:
+
+```bash
+echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
+  | env LATTICE_PROVIDER=serena node hooks/pre-tool-policy.mjs claude
+
+echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
+  | env LATTICE_PROVIDER=rtk node hooks/pre-tool-policy.mjs codex
+```
+
+Then fix the provider-specific config or unset that provider until it is ready.
+
+### `PostCompact hook returned invalid PostCompact hook JSON output`
+
+**Cause:** a PostCompact hook wrote empty stdout or non-JSON text. PostCompact
+hooks must write valid JSON.
+
+Provider rule:
+
+```json
+{}
+```
+
+Output `{}` when there is no context update. Write diagnostics to stderr, not
+stdout.
+
+### Codex warns `[features].codex_hooks` is deprecated
+
+Use this:
+
+```toml
+[features]
+hooks = true
+```
+
+Do not use this:
+
+```toml
+[features]
+codex_hooks = true
+```
+
+### `lattice: cannot find hooks/codex-hook-runner.mjs`
+
+**Cause:** Codex ran the hook from a cwd outside the consumer repo, or lattice
+is not mounted at the stable `hooks/` path.
+
+```bash
+ls hooks/codex-hook-runner.mjs
+# => hooks/codex-hook-runner.mjs
+```
+
+If the file exists, make sure `.codex/hooks.json` uses the command from
+[Codex CLI Config](#codex-cli-config). Do not replace it with a short
+`git rev-parse` command; Codex hook cwd is not always the repo root.
+
 ### `node --check` fails on a hook file
 
 **Cause:** Node.js version too old or file is corrupted/missing.
@@ -753,3 +991,16 @@ pnpm test
 ### Serena-specific issues
 
 See [`docs/SERENA-CLIENT-SETUP.md` § Troubleshooting](docs/SERENA-CLIENT-SETUP.md#troubleshooting).
+
+### RTK-specific issues
+
+RTK is fail-open unless the repo explicitly sets `LATTICE_REQUIRE_RTK=1`.
+
+```bash
+rtk --version
+# => exits 0 when RTK is installed
+
+echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
+  | env RTK_DISABLED=1 node hooks/pre-tool-policy.mjs codex
+# => skips RTK command rewriting for this invocation
+```
