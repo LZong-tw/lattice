@@ -68,7 +68,9 @@ describe("createContext", () => {
       env: { XDG_STATE_HOME: xdg },
     });
     try {
-      expect(ctx.stateDir).toContain("@lattice/clawback");
+      // join uses the OS-native separator, so the substring match works
+      // on both POSIX ("@lattice/clawback") and Windows ("@lattice\\clawback").
+      expect(ctx.stateDir).toContain(join("@lattice", "clawback"));
       expect(existsSync(ctx.stateDir)).toBe(true);
     } finally {
       dispose();

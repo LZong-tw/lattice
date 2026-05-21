@@ -1,3 +1,4 @@
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { stopChecklistProvider } from "../builtins/stop-checklist-provider.mjs";
@@ -112,10 +113,12 @@ describe("stopChecklistProvider Stop — verification gate", () => {
     );
 
     // The verification call should have received a sanitized payload
-    // with cwd === repoRoot.
+    // with cwd === path.resolve(repoRoot). On Windows path.resolve
+    // prepends the current drive letter, so compare against the
+    // resolved form rather than the literal POSIX string.
     expect(runProjectVerification).toHaveBeenCalledTimes(1);
     const callArg = runProjectVerification.mock.calls[0][0];
-    expect(callArg.payload.cwd).toBe("/var/repo/lattice");
+    expect(callArg.payload.cwd).toBe(path.resolve("/var/repo/lattice"));
     expect(stderr.join("")).toMatch(/ignoring payload\.cwd "\/tmp\/attacker-staged"/);
   });
 

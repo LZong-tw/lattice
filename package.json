@@ -4,7 +4,7 @@
   "description": "General-purpose AI-client hook layer — repo-scoped guardrails and lifecycle hooks for Claude Code, GitHub Copilot CLI, and Codex CLI",
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public",
