@@ -200,6 +200,9 @@ function renderResponseJson(event, merged, client) {
         ...merged.hookSpecificOutput,
       };
     }
+    if (event === EVENT_NAMES.PostCompact) {
+      return response;
+    }
     return Object.keys(response).length > 0 ? response : null;
   }
 

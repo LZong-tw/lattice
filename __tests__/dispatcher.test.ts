@@ -643,6 +643,32 @@ describe("dispatch — client-aware rendering", () => {
 });
 
 describe("dispatch — PostCompact round-trip", () => {
+  it("emits empty JSON when no PostCompact provider adds context", async () => {
+    registerProvider({
+      name: "noop-postcompact",
+      contractVersion: 1,
+      handlers: {
+        PostCompact: () => ({}),
+      },
+    });
+
+    const streams = captureStreams();
+    const code = await dispatch(
+      EVENT_NAMES.PostCompact,
+      {},
+      {
+        client: "claude-code",
+        env: { ...baseEnv, LATTICE_PROVIDERS: "noop-postcompact" },
+        stdout: streams.write,
+        stderr: streams.err,
+      },
+    );
+
+    expect(code).toBe(0);
+    const out = JSON.parse(streams.stdout.join("").trim());
+    expect(out).toEqual({});
+  });
+
   it("renders additionalContext from a PostCompact handler", async () => {
     registerProvider({
       name: "reinjector",
