@@ -37,15 +37,16 @@ function info(label) {
 
 // --- Node.js version ---
 const [major] = process.versions.node.split(".").map(Number);
-if (major >= 18) {
-  pass(`Node.js >= 18 (v${process.versions.node})`);
+if (major >= 20) {
+  pass(`Node.js >= 20 (v${process.versions.node})`);
 } else {
-  fail(`Node.js >= 18 (v${process.versions.node})`, "Upgrade to Node 18+");
+  fail(`Node.js >= 20 (v${process.versions.node})`, "Upgrade to Node 20+");
 }
 
 // --- Entry point syntax checks ---
 const entryPoints = [
   "index.mjs",
+  "init.mjs",
   "common.mjs",
   "session-start.mjs",
   "provider-registry.mjs",

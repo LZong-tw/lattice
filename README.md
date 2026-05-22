@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lzong-tw/lattice/actions/workflows/test.yml/badge.svg)](https://github.com/lzong-tw/lattice/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](#prerequisites)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](#prerequisites)
 
 `lattice` is a repo-scoped AI client runtime layer: shared hook entry points,
 policy gates, lifecycle reminders, and provider integrations for
@@ -11,8 +11,9 @@ policy gates, lifecycle reminders, and provider integrations for
 This repo is designed to be mounted into a consuming repo at the stable path
 `hooks/`. Each hook entry point is a thin shim around a v1 dispatcher that
 fans the event out to every registered provider, then merges their results
-into the Anthropic-spec response shape. Providers ship as separate npm
-packages or live in-tree under `builtins/`, `serena/`, and `semble/`.
+into the Anthropic-spec response shape. Providers live in-tree under
+`builtins/`, `serena/`, `semble/`, and `rtk/`; private package providers can
+also be loaded through `LATTICE_EXTRA_PROVIDERS`.
 
 **Companion projects:**
 - [`@lattice/clawback`](https://github.com/lzong-tw/clawback) — verification
@@ -30,6 +31,28 @@ after [One-Screen Done Check](#one-screen-done-check) passes.
 
 If you are editing lattice itself, skip to [Developer Setup](#developer-setup-editing-lattice-itself).
 
+For an OpenCode-style repo scan before editing config, run the init planner
+from the consumer repo. Without `--write`, this is read-only:
+
+```bash
+node /path/to/lattice/init.mjs --consumer "$(pwd)" --clients claude,codex --providers serena,semble
+# or, after lattice is already mounted at hooks/:
+node hooks/init.mjs --clients claude,codex --providers serena,semble
+```
+
+The planner prints the same phased install contract plus warnings for common
+drift such as deprecated Codex `[features].codex_hooks`.
+
+To let lattice create or update the managed project files, opt in explicitly:
+
+```bash
+node hooks/init.mjs --write --clients claude,codex --providers serena,semble
+```
+
+`--write` updates `.claude/settings.json`, `.codex/config.toml`,
+`.codex/hooks.json`, optional Copilot config, and a managed `AGENTS.md` block.
+It is idempotent: rerunning the same command should produce the same files.
+
 ### Phase 0 — Declare Inputs
 
 Run these from the consumer repo. Replace `LATTICE_REPO_URL` with the real
@@ -46,7 +69,7 @@ test -d "$CONSUMER_REPO/.git" && echo "consumer repo: $CONSUMER_REPO"
 
 ```bash
 node --version
-# => v18.x.x or higher
+# => v20.x.x or higher
 
 git --version
 # => git version 2.x.x or higher
@@ -74,11 +97,11 @@ git submodule add "$LATTICE_REPO_URL" hooks
 git submodule update --init --recursive
 ```
 
-**Option B: package copy (recommended for local/private experiments)**
+**Option B: internal package copy (only when your private registry mirrors lattice)**
 
 ```bash
 cd "$CONSUMER_REPO"
-pnpm add @lattice/core
+pnpm add @lattice/core  # from the approved internal registry only
 mkdir -p hooks
 node -e "import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lattice/core','hooks',{recursive:true})})"
 ```
@@ -220,7 +243,7 @@ Run each command and verify the expected output before proceeding.
 
 ```bash
 node --version
-# => v18.x.x or higher (minimum: Node 18)
+# => v20.x.x or higher (minimum: Node 20)
 
 git --version
 # => git version 2.x.x (any recent version)
@@ -729,7 +752,7 @@ A single-command health check for the lattice package:
 ```bash
 pnpm run doctor
 # Expected output (all lines start with ✓):
-# ✓ Node.js >= 18
+# ✓ Node.js >= 20
 # ✓ common.mjs parses
 # ✓ session-start.mjs parses
 # ✓ provider-registry.mjs parses
@@ -945,7 +968,7 @@ If the file exists, make sure `.codex/hooks.json` uses the command from
 
 ```bash
 node --version
-# Must be >= 18. If not, upgrade Node.js.
+# Must be >= 20. If not, upgrade Node.js.
 
 # Re-mount if files are missing:
 git submodule update --init --recursive
