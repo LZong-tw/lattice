@@ -1,6 +1,6 @@
 {
   "name": "@lzong.tw/lattice",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "General-purpose AI-client hook layer — repo-scoped guardrails and lifecycle hooks for Claude Code, GitHub Copilot CLI, and Codex CLI",
   "type": "module",
   "engines": {
