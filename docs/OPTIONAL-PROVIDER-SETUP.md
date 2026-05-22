@@ -81,6 +81,46 @@ rewrites to:
 rtk rewrite '<command>'
 ```
 
+### Install RTK Once Per Machine
+
+RTK is a user/global dependency, not project-local state. Do not reinstall RTK
+per repo. The project only opts into the Lattice `rtk` provider and may record
+`LATTICE_RTK_BIN` / `LATTICE_REQUIRE_RTK` policy.
+
+If `rtk --version` is missing on a developer machine or CI image, install it
+from the upstream RTK repo. On macOS, Homebrew is acceptable when it resolves to
+the RTK formula:
+
+```bash
+brew install rtk
+brew info rtk
+# => CLI proxy to minimize LLM token consumption
+# => https://www.rtk-ai.app/
+```
+
+For environments without Homebrew, use the upstream installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh
+```
+
+If the install script is unavailable, use Cargo:
+
+```bash
+cargo install --git https://github.com/rtk-ai/rtk rtk
+```
+
+Verify the binary is on the same PATH used by your AI-client hooks:
+
+```bash
+command -v rtk
+rtk --version
+rtk gain
+```
+
+If hooks cannot see the binary, set `LATTICE_RTK_BIN` in the project hook
+environment to the absolute path from `command -v rtk`.
+
 Default behavior is fail-open:
 
 - If `rtk` is missing, times out, or returns no rewrite, the original command runs.
@@ -115,8 +155,8 @@ echo '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}' \
 ### Init Shortcut
 
 `init.mjs --write --providers rtk` records the provider choice in the managed
-`AGENTS.md` block. RTK has no MCP config file because it is a CLI command
-rewrite provider:
+`AGENTS.md` block. It does not install RTK and does not create project-local RTK
+state. RTK has no MCP config file because it is a CLI command rewrite provider:
 
 ```bash
 node hooks/init.mjs --write --clients claude,codex --providers rtk

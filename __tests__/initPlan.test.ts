@@ -247,4 +247,19 @@ describe("lattice init install plan", () => {
     expect(config).toContain("hooks = true");
     expect(config).not.toContain("codex_hooks");
   });
+
+  it("documents RTK upstream install commands for agents", () => {
+    const doc = readFileSync(resolve(process.cwd(), "docs/OPTIONAL-PROVIDER-SETUP.md"), "utf8");
+
+    expect(doc).toContain("https://github.com/rtk-ai/rtk");
+    expect(doc).toContain("RTK is a user/global dependency, not project-local state.");
+    expect(doc).toContain("Do not reinstall RTK");
+    expect(doc).toContain("per repo.");
+    expect(doc).toContain("brew install rtk");
+    expect(doc).toContain("curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh");
+    expect(doc).toContain("cargo install --git https://github.com/rtk-ai/rtk rtk");
+    expect(doc).toContain("rtk gain");
+    expect(doc).toContain("It does not install RTK");
+    expect(doc).toContain("project-local RTK");
+  });
 });
