@@ -337,6 +337,25 @@ describe("Serena provider contracts", () => {
     expect(source).toContain("getClientPaths");
   });
 
+  it("shared Serena helper passes shell:true for uvx on Windows so uvx.cmd shims work", () => {
+    // Regression guard: Node refuses to spawn `uvx.cmd` (Scoop/winget/pip)
+    // without a shell. Both the spawnSync version probe and the detached
+    // spawn() launch must opt into shell on win32.
+    const source = readFileSync(resolve(packageRoot, "serena/start-http.mjs"), "utf8");
+
+    expect(source).toContain('process.platform === "win32"');
+    // The `isWindows` flag must be threaded into both the version check and
+    // the detached launcher spawn.
+    expect(source).toMatch(/spawnSync\("uvx",[\s\S]*?shell: isWindows/);
+    expect(source).toMatch(/spawn\("uvx",[\s\S]*?shell: isWindows/);
+  });
+
+  it("doctor uses shell:true on Windows for the uvx availability probe", () => {
+    const source = readFileSync(resolve(packageRoot, "doctor.mjs"), "utf8");
+
+    expect(source).toMatch(/spawnSync\("uvx",[\s\S]*?shell: process\.platform === "win32"/);
+  });
+
   it.each(expectedLaunchers)(
     "dashboard state maps $client to the expected port and context",
     ({ port, context }) => {

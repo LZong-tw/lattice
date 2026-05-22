@@ -48,7 +48,12 @@ if (await isPortListening(spec.port)) {
   process.exit(0);
 }
 
-const uvxCheck = spawnSync("uvx", ["--version"], { stdio: "ignore" });
+// On Windows, uvx is typically installed as `uvx.cmd` (Scoop/winget/pip).
+// Node won't spawn .cmd files without a shell, so use shell:true on win32
+// only. POSIX doesn't need it and shell:true changes argument escaping.
+const isWindows = process.platform === "win32";
+
+const uvxCheck = spawnSync("uvx", ["--version"], { stdio: "ignore", shell: isWindows });
 if (uvxCheck.error) {
   console.error("uvx is required to launch Serena, but it was not found on PATH.");
   process.exit(1);
@@ -81,6 +86,7 @@ const child = spawn("uvx", args, {
   detached: true,
   stdio: ["ignore", logFd, logFd],
   env: { ...process.env },
+  shell: isWindows,
 });
 
 fs.closeSync(logFd);
