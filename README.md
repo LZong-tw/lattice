@@ -45,43 +45,41 @@ after [One-Screen Done Check](#one-screen-done-check) passes.
 
 If you are editing lattice itself, skip to [Developer Setup](#developer-setup-editing-lattice-itself).
 
-For an OpenCode-style repo scan before editing config, run the init planner
-from the consumer repo. Without `--write`, this is read-only:
+### Quick install (any OS, recommended)
 
-```bash
-node /path/to/lattice/init.mjs --consumer "$(pwd)" --clients claude,codex --providers serena,semble
-# or, after lattice is already mounted at hooks/:
-node hooks/init.mjs --clients claude,codex --providers serena,semble
+Run from the consumer repo root. Works the same on macOS, Linux, and Windows
+(cmd.exe or PowerShell):
+
+```
+pnpm add @lzong.tw/lattice
+npx @lzong.tw/lattice init --write --mount copy --clients claude-code,codex
 ```
 
-The planner prints the same phased install contract plus warnings for common
-drift such as deprecated Codex `[features].codex_hooks`.
+That single `init --write` call mounts lattice at `hooks/`, writes the client
+config files (`.claude/settings.json`, `.codex/config.toml`,
+`.codex/hooks.json`, optional Copilot config), and emits a managed `AGENTS.md`
+block. It is idempotent — rerun any time to refresh.
 
-To let lattice create or update the managed project files, opt in explicitly:
+To preview without writing, drop `--write` (read-only plan output).
 
-```bash
-node hooks/init.mjs --write --clients claude,codex --providers serena,semble
-```
+Continue to [Phase 5 — Add Optional Providers](#phase-5--add-optional-providers)
+if you want Serena, Semble, or RTK; otherwise skip to
+[Phase 6 — Smoke Test](#phase-6--smoke-test-before-commit).
 
-`--write` updates `.claude/settings.json`, `.codex/config.toml`,
-`.codex/hooks.json`, optional Copilot config, and a managed `AGENTS.md` block.
-It is idempotent: rerunning the same command should produce the same files.
+### Phased manual contract
+
+The phases below are the same install contract laid out step-by-step, for LLM
+agents who follow it sequentially and for submodule users who need finer
+control. All commands run from the consumer repo root.
 
 ### Phase 0 — Declare Inputs
 
-Run these from the consumer repo. Replace `LATTICE_REPO_URL` with the real
-repository URL if you use the submodule path.
-
-```bash
-export CONSUMER_REPO="$(pwd)"
-export LATTICE_REPO_URL="<lattice-repo-url>"
-test -d "$CONSUMER_REPO/.git" && echo "consumer repo: $CONSUMER_REPO"
-# => consumer repo: /path/to/consumer
-```
+For the submodule mount path, have the lattice repo URL on hand
+(`https://github.com/lzong-tw/lattice` for the OSS core).
 
 ### Phase 1 — Check Prerequisites
 
-```bash
+```
 node --version
 # => v20.x.x or higher
 
@@ -91,7 +89,7 @@ git --version
 
 Optional providers need extra CLIs:
 
-```bash
+```
 uvx --version
 # => required only for Serena/Semble MCP startup commands
 
@@ -105,31 +103,27 @@ Choose exactly one mount strategy. Do not use both in the same consumer repo.
 
 **Option A: git submodule (recommended for shared project repos)**
 
-```bash
-cd "$CONSUMER_REPO"
-git submodule add "$LATTICE_REPO_URL" hooks
+```
+git submodule add https://github.com/lzong-tw/lattice hooks
 git submodule update --init --recursive
 ```
 
-**Option B: npm package copy**
+**Option B: npm package copy (recommended for individual projects)**
 
-```bash
-cd "$CONSUMER_REPO"
-pnpm add @lzong.tw/lattice
-mkdir -p hooks
-node -e "import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lzong.tw/lattice','hooks',{recursive:true})})"
 ```
+pnpm add @lzong.tw/lattice
+npx @lzong.tw/lattice init --write --mount copy --clients claude-code,codex
+```
+
+The `init --write --mount copy` step copies `node_modules/@lzong.tw/lattice`
+into `hooks/` using `node:fs` (no shell), so it works the same on every OS.
 
 The consumer path must be exactly `hooks/`. Client configs below depend on
 that stable path.
 
 ### Phase 3 — Verify the Mount
 
-```bash
-cd "$CONSUMER_REPO"
-ls hooks/common.mjs hooks/session-start.mjs hooks/codex-hook-runner.mjs hooks/pre-tool-policy.mjs
-# => all four files are listed
-
+```
 node --check hooks/common.mjs
 node --check hooks/session-start.mjs
 node --check hooks/codex-hook-runner.mjs
@@ -171,56 +165,50 @@ Reference docs:
 
 ### Phase 6 — Smoke Test Before Commit
 
-Run the shared smoke tests from the consumer repo:
+Run the shared smoke tests via the bundled helper. It works on macOS, Linux,
+cmd.exe, and PowerShell because the assertions live in `node`, not the shell:
 
-```bash
-cd "$CONSUMER_REPO"
-printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude; echo "exit: $?"
-# => exit: 0
-
-printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs codex; echo "exit: $?"
-# => exit: 0
-
-echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs claude
-# => stdout contains "permissionDecision":"deny"
-
-echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs codex
-# => stdout contains "permissionDecision":"deny"
+```
+node hooks/verification/smoke-plan.mjs session-start claude-code
+node hooks/verification/smoke-plan.mjs session-start codex
+node hooks/verification/smoke-plan.mjs pre-tool-deny claude-code
+node hooks/verification/smoke-plan.mjs pre-tool-deny codex
 ```
 
-For Copilot-only repos, run the same PreToolUse smoke test with `copilot`.
+Each command exits 0 on success and prints a non-zero exit with the failing
+assertion if a hook misfires.
+
+For Copilot-only repos, run the same checks with `copilot-cli`.
 
 ### One-Screen Done Check
 
 Consumer setup is complete only when all applicable checks pass:
 
-```bash
-cd "$CONSUMER_REPO"
-test -f hooks/common.mjs
+```
 node --check hooks/common.mjs
 node --check hooks/session-start.mjs
 node --check hooks/codex-hook-runner.mjs
 node --check hooks/pre-tool-policy.mjs
-printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude
-printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs codex
-echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs claude | grep '"permissionDecision":"deny"'
-echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs codex | grep '"permissionDecision":"deny"'
+node hooks/verification/smoke-plan.mjs session-start claude-code
+node hooks/verification/smoke-plan.mjs session-start codex
+node hooks/verification/smoke-plan.mjs pre-tool-deny claude-code
+node hooks/verification/smoke-plan.mjs pre-tool-deny codex
 ```
 
-Then confirm each client-specific file exists:
+Then confirm each client-specific file exists. Cross-platform existence check:
 
-```bash
-test -f .claude/settings.json        # if using Claude Code
-test -f .codex/config.toml           # if using Codex
-test -f .codex/hooks.json            # if using Codex
-test -f .github/hooks/repo-guardrails.json  # if using Copilot CLI
+```
+node -e "require('node:fs').accessSync('.claude/settings.json')"        # if using Claude Code
+node -e "require('node:fs').accessSync('.codex/config.toml')"           # if using Codex
+node -e "require('node:fs').accessSync('.codex/hooks.json')"            # if using Codex
+node -e "require('node:fs').accessSync('.github/hooks/repo-guardrails.json')"  # if using Copilot CLI
 ```
 
 Optional provider done checks:
 
-```bash
-curl -sf http://127.0.0.1:<serena-port>/mcp  # if Serena is required
-rg '"semble"|\\bsemble\\b' .mcp.json .codex/config.toml  # if Semble is required
+```
+node -e "require('node:http').get('http://127.0.0.1:9121/mcp',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"  # if Serena is required (substitute your port)
+node -e "const c=require('node:fs').readFileSync('.mcp.json','utf8')+require('node:fs').readFileSync('.codex/config.toml','utf8');process.exit(/\bsemble\b/.test(c)?0:1)"  # if Semble is required
 rtk --version  # if LATTICE_REQUIRE_RTK=1
 ```
 
@@ -477,12 +465,9 @@ and a smoke test.
 
 **Smoke test:**
 
-```bash
-printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude; echo "exit: $?"
-# => exit: 0
-
-echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs claude
-# => stdout contains "permissionDecision":"deny" (commit gate fires)
+```
+node hooks/verification/smoke-plan.mjs session-start claude-code
+node hooks/verification/smoke-plan.mjs pre-tool-deny claude-code
 ```
 
 ---
@@ -525,12 +510,9 @@ environment actually uses; there is no single repo-scoped Copilot MCP file that
 
 **Smoke test:**
 
-```bash
-printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs copilot; echo "exit: $?"
-# => exit: 0
-
-echo '{"toolName":"bash","toolArgs":"{\"command\":\"git commit -m test\"}"}' | node hooks/pre-tool-policy.mjs copilot
-# => stdout contains "permissionDecision":"deny"
+```
+node hooks/verification/smoke-plan.mjs session-start copilot-cli
+node hooks/verification/smoke-plan.mjs pre-tool-deny copilot-cli
 ```
 
 ---
@@ -600,12 +582,9 @@ from the hook payload `cwd` and then forwards stdin to the real hook script.
 
 **Smoke test:**
 
-```bash
-printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs codex; echo "exit: $?"
-# => exit: 0
-
-echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | node hooks/pre-tool-policy.mjs codex
-# => stdout contains "permissionDecision":"deny"
+```
+node hooks/verification/smoke-plan.mjs session-start codex
+node hooks/verification/smoke-plan.mjs pre-tool-deny codex
 ```
 
 ---
@@ -731,14 +710,13 @@ LATTICE_REQUIRE_RTK=1
 
 An LLM agent can consider consumer setup **complete** when ALL of these pass:
 
-1. `ls hooks/common.mjs` → file exists
-2. `node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs` → exits 0
-3. The client config file exists at the correct path (see per-client sections above)
-4. `printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs <client>` → exits 0
-5. The commit-gate smoke test returns `"permissionDecision":"deny"` for `git commit`
-6. (If Serena) `curl -sf http://127.0.0.1:<port>/mcp` responds (see SERENA-CLIENT-SETUP.md)
-7. (If Semble) Claude/Codex MCP config contains a stdio `semble` entry
-8. (If RTK is required) `rtk --version` exits 0 in the AI client's hook environment
+1. `node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs` → exits 0
+2. The client config file exists at the correct path (see per-client sections above)
+3. `node hooks/verification/smoke-plan.mjs session-start <client>` → exits 0 for each wired client (`claude-code`, `codex`, `copilot-cli`)
+4. `node hooks/verification/smoke-plan.mjs pre-tool-deny <client>` → exits 0 (the commit gate fires)
+5. (If Serena) the configured `http://127.0.0.1:<port>/mcp` endpoint responds (see SERENA-CLIENT-SETUP.md)
+6. (If Semble) Claude/Codex MCP config contains a stdio `semble` entry
+7. (If RTK is required) `rtk --version` exits 0 in the AI client's hook environment
 
 ---
 
@@ -909,6 +887,10 @@ Tests cover:
 **Cause:** the client can execute the hook, but a provider or policy gate is
 returning a blocking failure.
 
+The shell snippets below use POSIX pipes (`echo … | env VAR=… node …`).
+On Windows, run them under Git Bash, WSL, or rewrite as PowerShell
+(`$env:LATTICE_PROVIDER='none'; '...' | node hooks/pre-tool-policy.mjs ...`).
+
 ```bash
 # First isolate the shared hook layer:
 echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
@@ -993,9 +975,9 @@ git submodule update --init --recursive
 **Cause:** explicit provider selection is invalid, or a provider bootstrap
 returned a non-zero exit code.
 
-```bash
-# Isolate the shared hook layer by disabling all providers:
-printf '{}\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude
+```
+# Isolate the shared hook layer (smoke-plan disables all providers internally):
+node hooks/verification/smoke-plan.mjs session-start claude-code
 # => Should exit 0. If it does, the failure is provider-specific.
 
 # Then validate the selected provider config/env.
