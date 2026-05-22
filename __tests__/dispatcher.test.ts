@@ -37,6 +37,10 @@ function captureStreams() {
   };
 }
 
+function providerNames(selection: { providers: Array<{ name?: string }> }) {
+  return selection.providers.map((provider) => provider.name);
+}
+
 describe("dispatch — registration + selection", () => {
   it("invokes a registered handler for the matching event", async () => {
     const handler = vi.fn().mockResolvedValue({});
@@ -64,6 +68,58 @@ describe("dispatch — registration + selection", () => {
     expect(ctx.client).toBe("claude-code");
     expect(ctx.event).toBe("PreToolUse");
     expect(payload).toEqual({ tool_name: "Bash" });
+  });
+
+  it("uses LATTICE_PROVIDERS as a strict allowlist, not an optional-provider opt-in", () => {
+    registerProvider({
+      name: "lattice/protection",
+      contractVersion: 1,
+      handlers: { PreToolUse: vi.fn() },
+    });
+    registerProvider({
+      name: "serena",
+      contractVersion: 1,
+      handlers: { SessionStart: vi.fn() },
+    });
+    registerProvider({
+      name: "rtk",
+      contractVersion: 1,
+      handlers: { PreToolUse: vi.fn() },
+    });
+
+    const defaultSelection = resolveEffectiveProviders({
+      env: {} as NodeJS.ProcessEnv,
+      legacy: {},
+      onWarn: () => {},
+    });
+    expect(providerNames(defaultSelection)).toEqual([
+      "lattice/protection",
+      "serena",
+      "rtk",
+    ]);
+
+    const allowlistSelection = resolveEffectiveProviders({
+      env: { LATTICE_PROVIDERS: "serena,rtk" } as NodeJS.ProcessEnv,
+      legacy: {},
+      onWarn: () => {},
+    });
+    expect(providerNames(allowlistSelection)).toEqual([
+      "serena",
+      "rtk",
+    ]);
+    expect(
+      providerNames(allowlistSelection).some((name) => name === "lattice/protection"),
+    ).toBe(false);
+
+    const subtractiveSelection = resolveEffectiveProviders({
+      env: { LATTICE_DISABLE: "serena" } as NodeJS.ProcessEnv,
+      legacy: {},
+      onWarn: () => {},
+    });
+    expect(providerNames(subtractiveSelection)).toEqual([
+      "lattice/protection",
+      "rtk",
+    ]);
   });
 
   it("skips providers whose handlers map omits the event", async () => {

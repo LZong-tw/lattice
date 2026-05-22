@@ -152,6 +152,11 @@ echo '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}' \
 # => exits 0; may return updatedInput.command when RTK chooses a rewrite
 ```
 
+Do not copy `LATTICE_PROVIDER=rtk` or `LATTICE_PROVIDERS=rtk` into project hook
+config. Those are isolated smoke-test allowlists and would disable built-ins such
+as the commit gate. Normal projects should leave provider allowlists unset and
+use `LATTICE_DISABLE=<name>` only when subtracting a provider is intentional.
+
 ### Init Shortcut
 
 `init.mjs --write --providers rtk` records the provider choice in the managed

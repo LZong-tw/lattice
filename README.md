@@ -641,7 +641,8 @@ If you want the shared hooks without any provider at all, disable everything:
 
 You can also restrict the active set to an explicit allowlist with
 `LATTICE_PROVIDERS=<name1>,<name2>`, which takes precedence over
-`LATTICE_PROVIDER=<name>`.
+`LATTICE_PROVIDER=<name>`. Treat that as an advanced isolation switch: it
+replaces the full active set and can remove built-ins such as the commit gate.
 
 > **Note**: the legacy `bootstrapProviders` path on `provider-registry.mjs`
 > still defaults to `["serena"]` for backwards compatibility, but it is
@@ -798,8 +799,8 @@ side-effect calls `registerProvider`.
 | Variable | Behaviour |
 |----------|-----------|
 | _(none set)_ | Dispatcher activates every registered provider (built-ins + Serena + Semble + anything loaded via `LATTICE_EXTRA_PROVIDERS`). |
-| `LATTICE_PROVIDERS=<n1>,<n2>` | Explicit ordered allowlist; unknown names fail fast. |
-| `LATTICE_PROVIDER=<name>` | Single-provider allowlist; superseded by `LATTICE_PROVIDERS`. |
+| `LATTICE_PROVIDERS=<n1>,<n2>` | Explicit ordered allowlist; unknown names fail fast. This replaces the active set, so `LATTICE_PROVIDERS=serena,rtk` disables built-ins such as `lattice/protection` and the commit gate. Use only for isolation/debugging or deliberately minimal hook profiles. |
+| `LATTICE_PROVIDER=<name>` | Single-provider allowlist; superseded by `LATTICE_PROVIDERS`. Also disables all unlisted built-ins. |
 | `LATTICE_DISABLE=<n1>,<n2>` | Subtract these names from the active list. |
 | `LATTICE_PROVIDERS=none` (or `off` / `false` / `0`) | Disable all providers. |
 | `LATTICE_EXTRA_PROVIDERS=<spec1>,<spec2>` | Dynamically `import()` external provider modules at register-builtins load time. |
@@ -810,6 +811,11 @@ runner controls, built-in provider settings (`LATTICE_VERIFY_*`,
 carve-out for legacy names — see
 [`docs/PROVIDER-AUTHORING.md`](docs/PROVIDER-AUTHORING.md) § "Reserved env
 vars".
+
+For normal consumer repos, leave `LATTICE_PROVIDERS` and `LATTICE_PROVIDER`
+unset. Built-ins and optional bundled providers are registered by default. Use
+`LATTICE_DISABLE=<name>` when you need to subtract a provider without losing the
+commit gate.
 
 ### Per-event timeouts
 

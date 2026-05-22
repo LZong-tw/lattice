@@ -388,9 +388,9 @@ include short summaries; this table is the source of truth.
 
 | Variable | Used by | Purpose |
 |---|---|---|
-| `LATTICE_PROVIDERS` | `provider-registry.mjs` | Comma-separated ordered allowlist of providers. Takes precedence over `LATTICE_PROVIDER`. |
-| `LATTICE_PROVIDER` | `provider-registry.mjs` | Single-provider allowlist. Superseded by `LATTICE_PROVIDERS`. |
-| `LATTICE_DISABLE` | `provider-registry.mjs` | Comma-separated denylist subtracted from the active set. |
+| `LATTICE_PROVIDERS` | `provider-registry.mjs` | Comma-separated ordered allowlist of providers. Takes precedence over `LATTICE_PROVIDER`. Replaces the active set, so unlisted built-ins such as `lattice/protection` and the commit gate do not run. |
+| `LATTICE_PROVIDER` | `provider-registry.mjs` | Single-provider allowlist. Superseded by `LATTICE_PROVIDERS`. Also excludes unlisted built-ins. |
+| `LATTICE_DISABLE` | `provider-registry.mjs` | Comma-separated denylist subtracted from the active set. Prefer this for normal consumer repos that only need to turn off one provider. |
 | `LATTICE_EXTRA_PROVIDERS` | `register-builtins.mjs` | Comma-separated npm specifiers `import()`ed at startup to register external providers. |
 | `LATTICE_REPO_ROOT` | `common.mjs`, `context.mjs` | Override the auto-detected consumer repo root. |
 | `LATTICE_STATE_NAMESPACE` | `common.mjs` | Override the state directory namespace under `$XDG_STATE_HOME/`. |
