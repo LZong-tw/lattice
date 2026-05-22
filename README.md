@@ -111,11 +111,11 @@ git submodule add "$LATTICE_REPO_URL" hooks
 git submodule update --init --recursive
 ```
 
-**Option B: internal package copy (only when your private registry mirrors lattice)**
+**Option B: npm package copy**
 
 ```bash
 cd "$CONSUMER_REPO"
-pnpm add @lzong.tw/lattice  # from the approved internal registry only
+pnpm add @lzong.tw/lattice
 mkdir -p hooks
 node -e "import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lzong.tw/lattice','hooks',{recursive:true})})"
 ```
