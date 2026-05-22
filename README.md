@@ -8,18 +8,32 @@
 policy gates, lifecycle reminders, and provider integrations for
 **Claude Code**, **GitHub Copilot CLI**, and **Codex CLI**.
 
-This repo is designed to be mounted into a consuming repo at the stable path
-`hooks/`. Each hook entry point is a thin shim around a v1 dispatcher that
-fans the event out to every registered provider, then merges their results
-into the Anthropic-spec response shape. Providers live in-tree under
-`builtins/`, `serena/`, `semble/`, and `rtk/`; private package providers can
-also be loaded through `LATTICE_EXTRA_PROVIDERS`.
+This is the **public OSS core**. It contains the v1 dispatcher contract, the
+built-in providers (`builtins/`, `serena/`, `semble/`, `rtk/`), and the
+install planner (`init.mjs`). Organization-specific providers live out of
+tree and are loaded at runtime via `LATTICE_EXTRA_PROVIDERS` — keep this
+repo focused on the shared runtime and ship private logic as separate
+packages or a private overlay repo.
 
-**Companion projects:**
-- [`@lattice/clawback`](https://github.com/lzong-tw/clawback) — verification
-  gates (file protection, post-edit format/lint, stop-time typecheck) packaged
-  as a v1 lattice provider. See `examples/clawback-adapter/` in this repo for
-  a stub showing the integration shape.
+This repo is designed to be mounted into a consuming repo at the stable path
+`hooks/`. Each hook entry point is a thin shim around the v1 dispatcher that
+fans the event out to every registered provider, then merges their results
+into the Anthropic-spec response shape.
+
+## Recommended setup
+
+For day-to-day use, pair lattice with **clawback**. lattice gives you the
+hook runtime and policy gates; clawback gives you the verification loop
+(file protection, post-edit format/lint, stop-time typecheck) that turns
+those gates into a working guardrail.
+
+- [`@lattice/clawback`](https://github.com/lzong-tw/clawback) — the
+  canonical verification provider for lattice. Install it as a v1 lattice
+  provider and register it through `LATTICE_EXTRA_PROVIDERS`. See
+  `examples/clawback-adapter/` for the integration shape.
+
+Other providers (Serena MCP, Semble MCP, RTK command rewrite) ship in-tree
+and are opt-in through the install planner's `--providers` flag.
 
 ---
 
