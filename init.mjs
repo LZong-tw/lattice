@@ -150,12 +150,18 @@ function mountPhase(state, options) {
     phase.commands.push("git submodule update --init --recursive");
   }
 
-  phase.commands.push("ls hooks/common.mjs hooks/session-start.mjs hooks/codex-hook-runner.mjs hooks/pre-tool-policy.mjs");
   phase.commands.push("node --check hooks/common.mjs");
   phase.commands.push("node --check hooks/session-start.mjs");
   phase.commands.push("node --check hooks/codex-hook-runner.mjs");
   phase.commands.push("node --check hooks/pre-tool-policy.mjs");
   return phase;
+}
+
+function fileExistsCommand(relativePath) {
+  // `test -f` is POSIX-only. `node -e "require('node:fs').accessSync('X')"`
+  // works in cmd.exe and PowerShell because the outer double quotes survive
+  // and the inner string uses single quotes (PowerShell treats them literally).
+  return `node -e "require('node:fs').accessSync('${relativePath}')"`;
 }
 
 function clientPhase(state, options) {
@@ -172,7 +178,7 @@ function clientPhase(state, options) {
         ? "Review .claude/settings.json against README.md and keep the hooks/session-start.mjs, pre-tool-policy.mjs, post-tool-reminder.mjs, and stop-checklist.mjs commands aligned."
         : "Create or update .claude/settings.json with the Claude Code hook config from README.md.",
     );
-    phase.commands.push("test -f .claude/settings.json");
+    phase.commands.push(fileExistsCommand(".claude/settings.json"));
   }
 
   if (options.clients.includes("codex")) {
@@ -181,8 +187,8 @@ function clientPhase(state, options) {
         ? "Review .codex/config.toml and .codex/hooks.json against README.md, using [features].hooks and hooks/codex-hook-runner.mjs."
         : "Create or update .codex/config.toml and .codex/hooks.json with the Codex CLI config from README.md.",
     );
-    phase.commands.push("test -f .codex/config.toml");
-    phase.commands.push("test -f .codex/hooks.json");
+    phase.commands.push(fileExistsCommand(".codex/config.toml"));
+    phase.commands.push(fileExistsCommand(".codex/hooks.json"));
   }
 
   if (options.clients.includes("copilot")) {
@@ -191,7 +197,7 @@ function clientPhase(state, options) {
         ? "Review .github/hooks/repo-guardrails.json against README.md."
         : "Create or update .github/hooks/repo-guardrails.json with the GitHub Copilot CLI config from README.md.",
     );
-    phase.commands.push("test -f .github/hooks/repo-guardrails.json");
+    phase.commands.push(fileExistsCommand(".github/hooks/repo-guardrails.json"));
   }
 
   if (phase.actions.length === 0) {
@@ -234,29 +240,18 @@ function smokePhase(options) {
   const phase = {
     title: "Smoke test before commit",
     status: "required",
-    actions: ["Run these checks from the consumer repo and fix any failure before committing."],
+    actions: [
+      "Run these checks from the consumer repo and fix any failure before committing.",
+      "The smoke-plan helper runs in pure Node so it works the same on macOS, Linux, cmd.exe, and PowerShell.",
+    ],
     commands: [],
   };
 
   for (const client of options.clients) {
-    const hookClient = client === "copilot" ? "copilot" : client;
-    phase.commands.push(`printf '{}\\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs ${hookClient}`);
+    phase.commands.push(`node hooks/verification/smoke-plan.mjs session-start ${client}`);
   }
-
-  if (options.clients.includes("claude")) {
-    phase.commands.push(
-      "echo '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit -m test\"}}' | node hooks/pre-tool-policy.mjs claude | grep '\"permissionDecision\":\"deny\"'",
-    );
-  }
-  if (options.clients.includes("codex")) {
-    phase.commands.push(
-      "echo '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit -m test\"}}' | node hooks/pre-tool-policy.mjs codex | grep '\"permissionDecision\":\"deny\"'",
-    );
-  }
-  if (options.clients.includes("copilot")) {
-    phase.commands.push(
-      "echo '{\"toolName\":\"bash\",\"toolArgs\":\"{\\\"command\\\":\\\"git commit -m test\\\"}\"}' | node hooks/pre-tool-policy.mjs copilot | grep '\"permissionDecision\":\"deny\"'",
-    );
+  for (const client of options.clients) {
+    phase.commands.push(`node hooks/verification/smoke-plan.mjs pre-tool-deny ${client}`);
   }
 
   return phase;
@@ -321,14 +316,8 @@ function renderAgentsBlock(options) {
   const providers = options.providers.join(", ") || "(none)";
   const smokeCommands = [];
   const providerDocs = [];
-  if (options.clients.includes("claude")) {
-    smokeCommands.push("printf '{}\\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude");
-  }
-  if (options.clients.includes("codex")) {
-    smokeCommands.push("printf '{}\\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs codex");
-  }
-  if (options.clients.includes("copilot")) {
-    smokeCommands.push("printf '{}\\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs copilot");
+  for (const client of options.clients) {
+    smokeCommands.push(`node hooks/verification/smoke-plan.mjs session-start ${client}`);
   }
   if (options.providers.includes("serena")) {
     providerDocs.push("- Serena: `hooks/docs/SERENA-CLIENT-SETUP.md`");

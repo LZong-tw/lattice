@@ -354,6 +354,31 @@ describe("lattice init install plan", () => {
     expect((copyCommand as string).startsWith("node -e \"")).toBe(true);
   });
 
+  it("emits only cross-platform commands in the markdown plan", () => {
+    const root = tempRepo();
+    const state = detectConsumerState(root);
+    const plan = buildInstallPlan(state, {
+      clients: ["claude", "codex", "copilot"],
+      providers: [],
+      mount: "submodule",
+      latticeRepoUrl: "https://github.com/example/lattice.git",
+    });
+
+    const markdown = renderMarkdownPlan(plan);
+
+    // POSIX-only patterns that break on Windows cmd.exe / PowerShell.
+    expect(markdown).not.toMatch(/(^|\s)printf\s/);
+    expect(markdown).not.toMatch(/(^|\s)test -f\s/);
+    expect(markdown).not.toMatch(/(^|\s)env [A-Z_]+=/);
+    expect(markdown).not.toMatch(/\| grep /);
+    expect(markdown).not.toMatch(/^\s*ls\s/m);
+    // The session-start and pre-tool-deny smoke checks should run via the
+    // pure-Node helper so they behave identically on every platform.
+    expect(markdown).toContain("node hooks/verification/smoke-plan.mjs session-start claude");
+    expect(markdown).toContain("node hooks/verification/smoke-plan.mjs pre-tool-deny codex");
+    expect(markdown).toContain("node hooks/verification/smoke-plan.mjs pre-tool-deny copilot");
+  });
+
   it("documents RTK upstream install commands for agents", () => {
     const doc = readFileSync(resolve(process.cwd(), "docs/OPTIONAL-PROVIDER-SETUP.md"), "utf8");
 
