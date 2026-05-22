@@ -248,6 +248,112 @@ describe("lattice init install plan", () => {
     expect(config).not.toContain("codex_hooks");
   });
 
+  it("copies the published @lzong.tw/lattice package from node_modules into hooks/ when --mount copy --write", () => {
+    const root = tempRepo();
+    const pkgDir = join(root, "node_modules/@lzong.tw/lattice");
+    mkdirSync(pkgDir, { recursive: true });
+    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+      writeFileSync(join(pkgDir, file), `// stub ${file}\n`, "utf8");
+    }
+
+    const result = applyInstallPlan({
+      consumerRoot: root,
+      clients: ["claude"],
+      providers: [],
+      mount: "copy",
+      latticeRepoUrl: "<lattice-repo-url>",
+      format: "markdown",
+      write: true,
+    });
+
+    for (const file of [
+      "hooks/common.mjs",
+      "hooks/session-start.mjs",
+      "hooks/codex-hook-runner.mjs",
+      "hooks/pre-tool-policy.mjs",
+    ]) {
+      expect(readFileSync(join(root, file), "utf8")).toContain("stub");
+      expect(result.appliedFiles).toContain(file);
+    }
+    expect(result.appliedFiles).toContain(".claude/settings.json");
+    expect(result.warnings).not.toContain(
+      "Run `pnpm add @lzong.tw/lattice` (or npm/yarn equivalent) before re-running `lattice init --write --mount copy`.",
+    );
+  });
+
+  it("is idempotent across repeated --mount copy --write runs", () => {
+    const root = tempRepo();
+    const pkgDir = join(root, "node_modules/@lzong.tw/lattice");
+    mkdirSync(pkgDir, { recursive: true });
+    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+      writeFileSync(join(pkgDir, file), `// stub ${file}\n`, "utf8");
+    }
+
+    const options = {
+      consumerRoot: root,
+      clients: ["claude"],
+      providers: [],
+      mount: "copy" as const,
+      latticeRepoUrl: "<lattice-repo-url>",
+      format: "markdown" as const,
+      write: true,
+    };
+    applyInstallPlan(options);
+    const first = {
+      common: readFileSync(join(root, "hooks/common.mjs"), "utf8"),
+      sessionStart: readFileSync(join(root, "hooks/session-start.mjs"), "utf8"),
+      codexRunner: readFileSync(join(root, "hooks/codex-hook-runner.mjs"), "utf8"),
+      preTool: readFileSync(join(root, "hooks/pre-tool-policy.mjs"), "utf8"),
+    };
+
+    expect(() => applyInstallPlan(options)).not.toThrow();
+
+    expect(readFileSync(join(root, "hooks/common.mjs"), "utf8")).toBe(first.common);
+    expect(readFileSync(join(root, "hooks/session-start.mjs"), "utf8")).toBe(first.sessionStart);
+    expect(readFileSync(join(root, "hooks/codex-hook-runner.mjs"), "utf8")).toBe(first.codexRunner);
+    expect(readFileSync(join(root, "hooks/pre-tool-policy.mjs"), "utf8")).toBe(first.preTool);
+  });
+
+  it("warns and leaves hooks/ untouched when --mount copy --write runs without node_modules/@lzong.tw/lattice", () => {
+    const root = tempRepo();
+
+    const result = applyInstallPlan({
+      consumerRoot: root,
+      clients: ["claude"],
+      providers: [],
+      mount: "copy",
+      latticeRepoUrl: "<lattice-repo-url>",
+      format: "markdown",
+      write: true,
+    });
+
+    expect(result.warnings).toContain(
+      "Run `pnpm add @lzong.tw/lattice` (or npm/yarn equivalent) before re-running `lattice init --write --mount copy`.",
+    );
+    expect(result.appliedFiles).not.toContain("hooks/common.mjs");
+    expect(() => readFileSync(join(root, "hooks/common.mjs"), "utf8")).toThrow();
+  });
+
+  it("emits a cross-platform dry-run command for --mount copy without --write", () => {
+    const root = tempRepo();
+    const state = detectConsumerState(root);
+    const plan = buildInstallPlan(state, {
+      clients: ["claude"],
+      providers: [],
+      mount: "copy",
+      latticeRepoUrl: "<lattice-repo-url>",
+    });
+
+    const mountPhase = plan.phases[0];
+    const commands: string[] = mountPhase.commands as string[];
+    const copyCommand = commands.find((cmd) => cmd.startsWith("node -e"));
+    expect(copyCommand).toBeDefined();
+    expect(copyCommand).not.toContain("mkdir -p");
+    expect(copyCommand).not.toContain("import('node:fs')");
+    expect(copyCommand).toContain("require('node:fs')");
+    expect((copyCommand as string).startsWith("node -e \"")).toBe(true);
+  });
+
   it("documents RTK upstream install commands for agents", () => {
     const doc = readFileSync(resolve(process.cwd(), "docs/OPTIONAL-PROVIDER-SETUP.md"), "utf8");
 

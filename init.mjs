@@ -6,7 +6,7 @@
  * a concrete plan that an LLM agent or human can follow, then verify.
  */
 
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -142,7 +142,7 @@ function mountPhase(state, options) {
     phase.actions.push("Install @lzong.tw/lattice and copy it into the stable consumer path hooks/.");
     phase.commands.push("pnpm add @lzong.tw/lattice");
     phase.commands.push(
-      "mkdir -p hooks && node -e \"import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lzong.tw/lattice','hooks',{recursive:true})})\"",
+      "node -e \"const fs=require('node:fs');fs.rmSync('hooks',{recursive:true,force:true});fs.cpSync('node_modules/@lzong.tw/lattice','hooks',{recursive:true})\"",
     );
   } else {
     phase.actions.push("Add lattice as a git submodule at the stable consumer path hooks/.");
@@ -635,19 +635,27 @@ function codexConfigToml(existing, options) {
   return text;
 }
 
-function copyPackageMount(root) {
+const COPY_MOUNT_MISSING_WARNING =
+  "Run `pnpm add @lzong.tw/lattice` (or npm/yarn equivalent) before re-running `lattice init --write --mount copy`.";
+
+function copyPackageMountFromNodeModules(root) {
   const destination = resolve(root, "hooks");
+  const source = resolve(root, "node_modules/@lzong.tw/lattice");
+  if (!existsSync(source)) {
+    return { copied: false };
+  }
   if (resolve(root) === packageRoot) {
     throw new Error("refusing to copy lattice into itself as hooks/");
   }
-  rmSync(destination, { recursive: true, force: true });
-  cpSync(packageRoot, destination, {
+  cpSync(source, destination, {
     recursive: true,
-    filter(source) {
-      const parts = source.slice(packageRoot.length).split(/[\\/]/).filter(Boolean);
+    force: true,
+    filter(entry) {
+      const parts = entry.slice(source.length).split(/[\\/]/).filter(Boolean);
       return !parts.some((part) => [".git", "node_modules", "coverage", ".turbo"].includes(part));
     },
   });
+  return { copied: true };
 }
 
 export function applyInstallPlan(options) {
@@ -663,10 +671,15 @@ export function applyInstallPlan(options) {
   };
   const root = resolve(merged.consumerRoot);
   const appliedFiles = [];
+  const extraWarnings = [];
 
-  if (merged.write && merged.mount === "copy" && !detectConsumerState(root).hooksMounted) {
-    copyPackageMount(root);
-    appliedFiles.push("hooks/");
+  if (merged.write && merged.mount === "copy") {
+    const { copied } = copyPackageMountFromNodeModules(root);
+    if (copied) {
+      for (const file of MOUNT_FILES) appliedFiles.push(file);
+    } else {
+      extraWarnings.push(COPY_MOUNT_MISSING_WARNING);
+    }
   }
 
   if (merged.write && merged.clients.includes("claude")) {
@@ -698,7 +711,8 @@ export function applyInstallPlan(options) {
   }
 
   const state = detectConsumerState(root);
-  return { ...buildInstallPlan(state, merged), appliedFiles };
+  const plan = buildInstallPlan(state, merged);
+  return { ...plan, warnings: [...plan.warnings, ...extraWarnings], appliedFiles };
 }
 
 export function renderMarkdownPlan(plan) {
