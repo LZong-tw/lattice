@@ -5,7 +5,15 @@
 
 Serena is an **optional** provider integration shipped with `lattice`. The
 shared hook layer works without Serena. You only need this doc if you want
-MCP server lifecycle management and the Serena dashboard.
+Serena MCP tools plus dashboard lifecycle support.
+
+Important contract:
+
+- AI-client MCP tool attachment must use **stdio** `command` / `args`.
+- The managed HTTP server is only for lifecycle and dashboard support.
+- Do not configure Serena tools with `url = "http://127.0.0.1:.../mcp"` when
+  `LATTICE_REQUIRE_SERENA_MCP=1`; the guard rejects HTTP config because tools
+  may attach too late during startup.
 
 ---
 
@@ -54,7 +62,7 @@ Python 3.10+ must be available as `python3` on PATH. On macOS:
 
 ## Per-Client Endpoints
 
-| Client | Launcher script | Port | MCP Endpoint | Serena Context |
+| Client | Launcher script | Port | Managed HTTP endpoint | Serena Context |
 |--------|----------------|------|--------------|----------------|
 | GitHub Copilot CLI | `serena/start-http-ide.sh` | 9121 | `http://127.0.0.1:9121/mcp` | `ide` |
 | Claude Code | `serena/start-http-claude-code.sh` | 9122 | `http://127.0.0.1:9122/mcp` | `claude-code` |
@@ -65,8 +73,8 @@ Python 3.10+ must be available as `python3` on PATH. On macOS:
 ## MCP Server Lifecycle
 
 `session-start.mjs` delegates to `serena/bootstrap.mjs`, which starts Serena in
-streamable HTTP mode through per-client launcher scripts. The shared starter
-runs:
+streamable HTTP mode through per-client launcher scripts. This is separate from
+the stdio MCP tool config below. The shared starter runs:
 
 ```bash
 uvx --from git+https://github.com/oraios/serena serena start-mcp-server \
@@ -90,33 +98,47 @@ The base hooks config in `.claude/settings.json` (see [README](../README.md#clau
 already calls `session-start.mjs claude`, which triggers Serena bootstrap
 automatically.
 
-**Additional MCP config surface** — add Serena as an MCP server so Claude Code
-can call Serena tools. The repo-scoped Claude MCP file is `.mcp.json`:
+**Additional MCP config surface** — add Serena as a stdio MCP server so Claude
+Code can call Serena tools at startup. The repo-scoped Claude MCP file is
+`.mcp.json`:
 
 ```jsonc
 // .mcp.json
 {
   "mcpServers": {
     "serena": {
-      "type": "streamable-http",
-      "url": "http://127.0.0.1:9122/mcp"
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "claude-code",
+        "--project-from-cwd"
+      ]
     }
   }
 }
 ```
 
+If Claude Code does not launch the MCP command from the repo root, replace
+`--project-from-cwd` with `--project /absolute/path/to/consumer-repo`.
+
 **Smoke test:**
 
 ```bash
-# 1. Start Serena for Claude:
 echo '{}' | node hooks/session-start.mjs claude
 # => stderr: "Serena claude is ready at http://127.0.0.1:9122/mcp (PID ...)"
 #    OR "Serena already listening on 127.0.0.1:9122 for claude."
 #    exit: 0
 
-# 2. Verify the endpoint responds:
 curl -sf http://127.0.0.1:9122/mcp -o /dev/null && echo "OK" || echo "FAIL"
 # => OK
+
+printf '{}\n' | env LATTICE_REQUIRE_SERENA_MCP=1 node hooks/session-start.mjs claude
+# => exit: 0
 ```
 
 ### GitHub Copilot CLI + Serena
@@ -151,8 +173,8 @@ curl -sf http://127.0.0.1:9121/mcp -o /dev/null && echo "OK" || echo "FAIL"
 The base hooks config in `.codex/hooks.json` (see [README](../README.md#codex-cli-config))
 already calls `session-start.mjs codex`, which triggers Serena bootstrap.
 
-**Additional MCP config surface** — add Serena to Codex's repo-scoped
-`.codex/config.toml`:
+**Additional MCP config surface** — add Serena as a stdio MCP server to Codex's
+repo-scoped `.codex/config.toml`:
 
 ```toml
 # .codex/config.toml
@@ -160,8 +182,12 @@ already calls `session-start.mjs codex`, which triggers Serena bootstrap.
 hooks = true
 
 [mcp_servers.serena]
-url = "http://127.0.0.1:9123/mcp"
+command = "uvx"
+args = ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "codex", "--project-from-cwd"]
 ```
+
+If Codex does not launch the MCP command from the repo root, replace
+`--project-from-cwd` with `--project /absolute/path/to/consumer-repo`.
 
 **Smoke test:**
 
@@ -172,6 +198,9 @@ echo '{}' | node hooks/session-start.mjs codex
 
 curl -sf http://127.0.0.1:9123/mcp -o /dev/null && echo "OK" || echo "FAIL"
 # => OK
+
+printf '{}\n' | env LATTICE_REQUIRE_SERENA_MCP=1 node hooks/session-start.mjs codex
+# => exit: 0
 ```
 
 ---

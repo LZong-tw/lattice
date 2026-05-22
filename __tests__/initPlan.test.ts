@@ -10,6 +10,8 @@ import {
   parseInitArgs,
   renderMarkdownPlan,
 } from "../init.mjs";
+import { validateRequiredSerenaMcpConfig } from "../serena/mcp-config-guard.mjs";
+import { validateRequiredSembleMcpConfig } from "../semble/mcp-config-guard.mjs";
 
 function tempRepo() {
   const root = mkdtempSync(join(tmpdir(), "lattice-init-consumer-"));
@@ -111,7 +113,7 @@ describe("lattice init install plan", () => {
     const result = applyInstallPlan({
       consumerRoot: root,
       clients: ["claude", "codex"],
-      providers: ["serena", "semble"],
+      providers: [],
       mount: "submodule",
       latticeRepoUrl: "<lattice-repo-url>",
       format: "markdown",
@@ -134,6 +136,61 @@ describe("lattice init install plan", () => {
     expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toContain("lattice:init:v1");
   });
 
+  it("writes provider MCP config that satisfies Serena and Semble startup guards", () => {
+    const root = tempRepo();
+    mkdirSync(join(root, "hooks"));
+    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+      writeFileSync(join(root, "hooks", file), "", "utf8");
+    }
+
+    applyInstallPlan({
+      consumerRoot: root,
+      clients: ["claude", "codex"],
+      providers: ["serena", "semble", "rtk"],
+      mount: "submodule",
+      latticeRepoUrl: "<lattice-repo-url>",
+      format: "markdown",
+      write: true,
+    });
+
+    const claudeMcp = JSON.parse(readFileSync(join(root, ".mcp.json"), "utf8"));
+    expect(claudeMcp.mcpServers.serena.command).toBe("uvx");
+    expect(claudeMcp.mcpServers.serena.args).toContain("start-mcp-server");
+    expect(claudeMcp.mcpServers.serena.args).toContain("--project-from-cwd");
+    expect(claudeMcp.mcpServers.semble).toEqual({
+      type: "stdio",
+      command: "uvx",
+      args: ["--from", "semble[mcp]", "semble"],
+    });
+
+    const codexConfig = readFileSync(join(root, ".codex/config.toml"), "utf8");
+    expect(codexConfig).toContain("[mcp_servers.serena]");
+    expect(codexConfig).toContain("start-mcp-server");
+    expect(codexConfig).toContain("--project-from-cwd");
+    expect(codexConfig).toContain("[mcp_servers.semble]");
+
+    expect(validateRequiredSerenaMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+    expect(validateRequiredSerenaMcpConfig("codex", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+    expect(validateRequiredSembleMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+    expect(validateRequiredSembleMcpConfig("codex", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+
+    const agents = readFileSync(join(root, "AGENTS.md"), "utf8");
+    expect(agents).toContain("hooks/docs/SERENA-CLIENT-SETUP.md");
+    expect(agents).toContain("hooks/docs/OPTIONAL-PROVIDER-SETUP.md");
+  });
+
   it("is idempotent when write mode runs more than once", () => {
     const root = tempRepo();
     mkdirSync(join(root, "hooks"));
@@ -144,7 +201,7 @@ describe("lattice init install plan", () => {
     const options = {
       consumerRoot: root,
       clients: ["claude", "codex"],
-      providers: ["serena"],
+      providers: [],
       mount: "submodule",
       latticeRepoUrl: "<lattice-repo-url>",
       format: "markdown",

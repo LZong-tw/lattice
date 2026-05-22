@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_CLIENTS = Object.freeze(["claude", "codex"]);
 const DEFAULT_PROVIDERS = Object.freeze([]);
+const SERENA_UPSTREAM_SPEC = "git+https://github.com/oraios/serena";
 const MOUNT_FILES = Object.freeze([
   "hooks/common.mjs",
   "hooks/session-start.mjs",
@@ -319,6 +320,7 @@ function renderAgentsBlock(options) {
   const clients = options.clients.join(", ") || "(none)";
   const providers = options.providers.join(", ") || "(none)";
   const smokeCommands = [];
+  const providerDocs = [];
   if (options.clients.includes("claude")) {
     smokeCommands.push("printf '{}\\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs claude");
   }
@@ -327,6 +329,12 @@ function renderAgentsBlock(options) {
   }
   if (options.clients.includes("copilot")) {
     smokeCommands.push("printf '{}\\n' | env LATTICE_PROVIDER=none node hooks/session-start.mjs copilot");
+  }
+  if (options.providers.includes("serena")) {
+    providerDocs.push("- Serena: `hooks/docs/SERENA-CLIENT-SETUP.md`");
+  }
+  if (options.providers.includes("semble") || options.providers.includes("rtk")) {
+    providerDocs.push("- Semble/RTK: `hooks/docs/OPTIONAL-PROVIDER-SETUP.md`");
   }
 
   return [
@@ -341,6 +349,7 @@ function renderAgentsBlock(options) {
     "- If Serena/Semble/RTK are required, enable their `LATTICE_REQUIRE_*` flags only after the matching smoke tests pass.",
     `- Selected clients at init time: ${clients}.`,
     `- Selected optional providers at init time: ${providers}.`,
+    ...(providerDocs.length > 0 ? ["", "Provider setup docs:", ...providerDocs] : []),
     "",
     "Useful checks:",
     "",
@@ -523,6 +532,64 @@ function withoutDeprecatedCodexHooks(text) {
     .join("\n");
 }
 
+function serenaContextForClient(client) {
+  return client === "claude" ? "claude-code" : client;
+}
+
+function serenaMcpEntry(client) {
+  return {
+    type: "stdio",
+    command: "uvx",
+    args: [
+      "--from",
+      SERENA_UPSTREAM_SPEC,
+      "serena",
+      "start-mcp-server",
+      "--context",
+      serenaContextForClient(client),
+      "--project-from-cwd",
+    ],
+  };
+}
+
+function sembleMcpEntry() {
+  return {
+    type: "stdio",
+    command: "uvx",
+    args: ["--from", "semble[mcp]", "semble"],
+  };
+}
+
+function parseJsonObject(text, relativePath) {
+  const trimmed = text.trim();
+  if (!trimmed) return {};
+  const parsed = JSON.parse(trimmed);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${relativePath} must contain a JSON object`);
+  }
+  return parsed;
+}
+
+function claudeMcpJson(existing, options) {
+  const config = parseJsonObject(existing, ".mcp.json");
+  const mcpServers =
+    config.mcpServers && typeof config.mcpServers === "object" && !Array.isArray(config.mcpServers)
+      ? { ...config.mcpServers }
+      : {};
+
+  if (options.providers.includes("serena")) {
+    mcpServers.serena = serenaMcpEntry("claude");
+  }
+  if (options.providers.includes("semble")) {
+    mcpServers.semble = sembleMcpEntry();
+  }
+
+  return {
+    ...config,
+    mcpServers,
+  };
+}
+
 function upsertTomlSection(text, header, bodyLines) {
   const normalized = text.replace(/\r\n/g, "\n").trimEnd();
   const lines = normalized ? normalized.split("\n") : [];
@@ -551,14 +618,17 @@ function codexConfigToml(existing, options) {
   text = ensureTomlKeyInSection(text, "features", "hooks", "true");
 
   if (options.providers.includes("serena")) {
+    const entry = serenaMcpEntry("codex");
     text = upsertTomlSection(text, "mcp_servers.serena", [
-      'url = "http://127.0.0.1:9123/mcp"',
+      `command = ${JSON.stringify(entry.command)}`,
+      `args = ${JSON.stringify(entry.args)}`,
     ]);
   }
   if (options.providers.includes("semble")) {
+    const entry = sembleMcpEntry();
     text = upsertTomlSection(text, "mcp_servers.semble", [
-      'command = "uvx"',
-      'args = ["--from", "semble[mcp]", "semble"]',
+      `command = ${JSON.stringify(entry.command)}`,
+      `args = ${JSON.stringify(entry.args)}`,
     ]);
   }
 
@@ -602,6 +672,10 @@ export function applyInstallPlan(options) {
   if (merged.write && merged.clients.includes("claude")) {
     writeJson(root, ".claude/settings.json", claudeSettings());
     appliedFiles.push(".claude/settings.json");
+    if (merged.providers.includes("serena") || merged.providers.includes("semble")) {
+      writeJson(root, ".mcp.json", claudeMcpJson(readExisting(root, ".mcp.json"), merged));
+      appliedFiles.push(".mcp.json");
+    }
   }
 
   if (merged.write && merged.clients.includes("codex")) {
