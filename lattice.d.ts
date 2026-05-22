@@ -116,22 +116,22 @@ export interface LatticeProvider {
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  */
 export const DEFAULT_PROVIDER_NAMES: ReadonlyArray<string>;
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  */
 export const providerRegistry: Readonly<Record<string, { name?: string; bootstrap: (client: string) => Promise<number> | number }>>;
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  */
 export function parseProviderList(raw: string): string[];
 
@@ -146,8 +146,8 @@ export interface SelectedProvidersResult {
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  */
 export function resolveSelectedProviders(opts?: {
   env?: NodeJS.ProcessEnv;
@@ -156,8 +156,8 @@ export function resolveSelectedProviders(opts?: {
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  */
 export function bootstrapProviders(
   client: string,
@@ -225,7 +225,7 @@ export function dispatch(
 ): Promise<number>;
 
 // ---------------------------------------------------------------------------
-// testing (subpath: "@lattice/core/testing")
+// testing (subpath: "@lzong.tw/lattice/testing")
 // ---------------------------------------------------------------------------
 
 export interface MockContextResult {

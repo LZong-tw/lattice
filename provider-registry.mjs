@@ -22,15 +22,15 @@ const DISABLE_PROVIDER_TOKENS = new Set(["none", "off", "false", "0"]);
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  */
 export const DEFAULT_PROVIDER_NAMES = Object.freeze(["serena"]);
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  */
 export const providerRegistry = Object.freeze({
   serena: Object.freeze({
@@ -62,8 +62,8 @@ function normalizeProviderName(value) {
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  */
 export function parseProviderList(raw) {
   if (typeof raw !== "string") {
@@ -105,8 +105,8 @@ function getSelectionSource(env) {
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  *
  * @param {{
  *   env?: NodeJS.ProcessEnv,
@@ -163,8 +163,8 @@ function defaultOnError(message) {
 
 /**
  * @deprecated Will be removed in v2. Use `dispatch()` from
- * `@lattice/core/dispatcher` and `registerProvider()` from
- * `@lattice/core/provider-registry` instead.
+ * `@lzong.tw/lattice/dispatcher` and `registerProvider()` from
+ * `@lzong.tw/lattice/provider-registry` instead.
  *
  * @param {string} client
  * @param {{

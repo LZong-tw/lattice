@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * testing.mjs — provider-author test helpers (`@lattice/core/testing`).
+ * testing.mjs — provider-author test helpers (`@lzong.tw/lattice/testing`).
  *
  * Lets external providers (clawback, future packages) write unit tests
  * without booting a real Claude Code session. Three exports:

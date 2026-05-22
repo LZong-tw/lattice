@@ -31,7 +31,7 @@ to public fix.
 ## Scope
 
 In-scope:
-- Code in `@lattice/core` (this repo) that runs as part of a hook invocation
+- Code in `@lzong.tw/lattice` (this repo) that runs as part of a hook invocation
 - The way provider definitions are loaded via `LATTICE_EXTRA_PROVIDERS`
 - Anything in `lattice.d.ts` that could mislead a provider author into writing
   unsafe code

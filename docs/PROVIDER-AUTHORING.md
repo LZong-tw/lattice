@@ -1,6 +1,6 @@
 # Writing a lattice Provider (v1 contract)
 
-> **Audience**: anyone shipping a new provider for `@lattice/core` — either
+> **Audience**: anyone shipping a new provider for `@lzong.tw/lattice` — either
 > as an external npm package (e.g. `@your-scope/foo`) or as a new built-in
 > inside this repo.
 
@@ -38,7 +38,7 @@ export const myProvider = Object.freeze({
 Register it as a side effect of importing your module:
 
 ```javascript
-import { registerProvider } from "@lattice/core/provider-registry";
+import { registerProvider } from "@lzong.tw/lattice/provider-registry";
 import { myProvider } from "./provider.mjs";
 
 registerProvider(myProvider);
@@ -65,10 +65,10 @@ and lattice `handlers` are 1:1 readable:
 | `Notification` | Agent needs operator attention | ✅ |
 | any other Anthropic event | (future) | ❌ — registration is accepted but inert until a dispatcher ships |
 
-Use `EVENT_NAMES` from `@lattice/core/dispatcher` to avoid typos:
+Use `EVENT_NAMES` from `@lzong.tw/lattice/dispatcher` to avoid typos:
 
 ```javascript
-import { EVENT_NAMES } from "@lattice/core/dispatcher";
+import { EVENT_NAMES } from "@lzong.tw/lattice/dispatcher";
 // EVENT_NAMES.PreToolUse === "PreToolUse"
 ```
 
@@ -111,7 +111,7 @@ order, then folds the results:
 Use the exported constants for decision literals:
 
 ```javascript
-import { PERMISSION_DECISIONS, STOP_DECISIONS } from "@lattice/core/dispatcher";
+import { PERMISSION_DECISIONS, STOP_DECISIONS } from "@lzong.tw/lattice/dispatcher";
 // PERMISSION_DECISIONS.DENY === "deny"
 // STOP_DECISIONS.BLOCK === "block"
 ```
@@ -240,10 +240,10 @@ supportedClients: Object.freeze(["claude-code"]),  // skipped silently on copilo
 
 ## Testing
 
-`@lattice/core/testing` ships three helpers:
+`@lzong.tw/lattice/testing` ships three helpers:
 
 ```javascript
-import { mockContext, runProvider, mockPayload } from "@lattice/core/testing";
+import { mockContext, runProvider, mockPayload } from "@lzong.tw/lattice/testing";
 ```
 
 ### `runProvider(provider, event, payload, opts?)`
@@ -252,7 +252,7 @@ The 90% case. Invokes one provider's handler in isolation, returns the raw
 result plus captured stderr.
 
 ```javascript
-import { runProvider, mockPayload } from "@lattice/core/testing";
+import { runProvider, mockPayload } from "@lzong.tw/lattice/testing";
 import { myProvider } from "../provider.mjs";
 
 const { result, stderr } = await runProvider(
@@ -309,7 +309,7 @@ a context line:
 
 ```javascript
 // provider.mjs
-import { STOP_DECISIONS } from "@lattice/core/dispatcher";
+import { STOP_DECISIONS } from "@lzong.tw/lattice/dispatcher";
 
 export const stopGateProvider = Object.freeze({
   name: "@example/stop-gate",
@@ -331,7 +331,7 @@ export const stopGateProvider = Object.freeze({
 
 ```javascript
 // index.mjs (registers as side effect of import)
-import { registerProvider } from "@lattice/core/provider-registry";
+import { registerProvider } from "@lzong.tw/lattice/provider-registry";
 import { stopGateProvider } from "./provider.mjs";
 
 registerProvider(stopGateProvider);
@@ -340,7 +340,7 @@ registerProvider(stopGateProvider);
 ```javascript
 // __tests__/stopGate.test.ts
 import { describe, expect, it } from "vitest";
-import { runProvider, mockPayload } from "@lattice/core/testing";
+import { runProvider, mockPayload } from "@lzong.tw/lattice/testing";
 import { stopGateProvider } from "../provider.mjs";
 
 describe("stop-gate", () => {
@@ -380,7 +380,7 @@ in their custom hook script.
 ## Reserved env vars
 
 This list is the canonical reference for every `LATTICE_*` env var that
-`@lattice/core` and its built-in providers read at runtime. External
+`@lzong.tw/lattice` and its built-in providers read at runtime. External
 providers must not shadow these names. `README.md` and `PROVIDER-ROLLOUT.md`
 include short summaries; this table is the source of truth.
 
@@ -433,7 +433,7 @@ prevented.
   `contractVersion: 2` would ship alongside v1 for at least one minor
   version with an explicit deprecation period.
 - The dispatcher refuses to register a provider whose declared
-  `contractVersion` doesn't match what `@lattice/core` understands — fail
+  `contractVersion` doesn't match what `@lzong.tw/lattice` understands — fail
   fast, no silent skip.
 - New optional fields on `LatticeHandlerResult` / `LatticeContext` are
   additive and don't bump the contract version.

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@lattice/core` are documented here.
+All notable changes to `@lzong.tw/lattice` are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -39,7 +39,7 @@ First public release.
 - **Codex hook runner** (`codex-hook-runner.mjs`): driven by
   `LATTICE_HOOK_TARGET` / `LATTICE_HOOK_CLIENT`, resolves the mounted
   `hooks/` directory from the Codex payload `cwd`.
-- **Testing helpers** at `@lattice/core/testing` (`testing.mjs`):
+- **Testing helpers** at `@lzong.tw/lattice/testing` (`testing.mjs`):
   `runProvider()`, `mockContext()`, `mockPayload.<event>()` for isolated
   provider tests with auto-managed temp `stateDir`.
 - **TypeScript declarations** (`lattice.d.ts`) covering `LatticeProvider`,

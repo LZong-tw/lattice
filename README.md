@@ -115,9 +115,9 @@ git submodule update --init --recursive
 
 ```bash
 cd "$CONSUMER_REPO"
-pnpm add @lattice/core  # from the approved internal registry only
+pnpm add @lzong.tw/lattice  # from the approved internal registry only
 mkdir -p hooks
-node -e "import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lattice/core','hooks',{recursive:true})})"
+node -e "import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lzong.tw/lattice','hooks',{recursive:true})})"
 ```
 
 The consumer path must be exactly `hooks/`. Client configs below depend on
@@ -315,7 +315,7 @@ START
 
 | Layer | Location | Purpose |
 |-------|----------|---------|
-| Public barrel | `index.mjs` | Root `@lattice/core` export — re-exports the user-facing surface (`registerProvider`, `dispatch`, constants, types). |
+| Public barrel | `index.mjs` | Root `@lzong.tw/lattice` export — re-exports the user-facing surface (`registerProvider`, `dispatch`, constants, types). |
 | TypeScript contract | `lattice.d.ts` | Public type definitions for `LatticeProvider`, `LatticeContext`, `LatticeHandlerResult`, and helpers. |
 | Dispatcher | `dispatcher.mjs` | v1 event dispatcher — fans events to every registered provider and merges results into Anthropic response shape. |
 | Context | `context.mjs` | Builds the frozen `LatticeContext` (cwd, repoRoot, stateDir, env snapshot, signal) per dispatch. |
@@ -326,7 +326,7 @@ START
 | Built-in providers | `builtins/` | `protection`, `commit-checkpoint`, `screenshot-reminder`, `edit-reminder`, `stop-checklist` v1 providers. |
 | Shared runtime | `*.mjs` (root) | Client-agnostic hook entry points and policy logic (`session-start.mjs`, `pre-tool-policy.mjs`, `stop-checklist.mjs`, etc.). |
 | Codex runner | `codex-hook-runner.mjs` | Forwards Codex hook payloads to the right entry script (driven by `LATTICE_HOOK_TARGET` / `LATTICE_HOOK_CLIENT`). |
-| Testing helpers | `testing.mjs` | `mockContext`, `runProvider`, `mockPayload` — published as `@lattice/core/testing`. |
+| Testing helpers | `testing.mjs` | `mockContext`, `runProvider`, `mockPayload` — published as `@lzong.tw/lattice/testing`. |
 | MCP config helpers | `mcp-config-common.mjs` | Shared JSON/TOML parser utilities for startup MCP guards. |
 | File protection | `protection.mjs` | Edit guard for env files, `.git/`, and detected lockfiles. |
 | Verification profile | `verification/` | Stack-aware typecheck/lint detection and optional Stop gate. |

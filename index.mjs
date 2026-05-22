@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * @lattice/core barrel — the public API for `import ... from "@lattice/core"`.
+ * @lzong.tw/lattice barrel — the public API for `import ... from "@lzong.tw/lattice"`.
  *
  * Re-exports the v1 dispatcher, registry, context, timeouts, client enum,
  * and the most common constants. Test helpers live under
- * `@lattice/core/testing`. Built-in providers and provider definitions
- * live under their own subpaths (e.g. `@lattice/core/builtins/protection-provider`).
+ * `@lzong.tw/lattice/testing`. Built-in providers and provider definitions
+ * live under their own subpaths (e.g. `@lzong.tw/lattice/builtins/protection-provider`).
  */
 
 export {

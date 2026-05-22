@@ -139,10 +139,10 @@ function mountPhase(state, options) {
   if (state.hooksMounted) {
     phase.actions.push("Keep the existing hooks/ mount and continue to client wiring checks.");
   } else if (options.mount === "copy") {
-    phase.actions.push("Install @lattice/core and copy it into the stable consumer path hooks/.");
-    phase.commands.push("pnpm add @lattice/core");
+    phase.actions.push("Install @lzong.tw/lattice and copy it into the stable consumer path hooks/.");
+    phase.commands.push("pnpm add @lzong.tw/lattice");
     phase.commands.push(
-      "mkdir -p hooks && node -e \"import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lattice/core','hooks',{recursive:true})})\"",
+      "mkdir -p hooks && node -e \"import('node:fs').then(({cpSync,rmSync})=>{rmSync('hooks',{recursive:true,force:true});cpSync('node_modules/@lzong.tw/lattice','hooks',{recursive:true})})\"",
     );
   } else {
     phase.actions.push("Add lattice as a git submodule at the stable consumer path hooks/.");

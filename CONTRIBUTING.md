@@ -14,7 +14,7 @@ By participating you agree to abide by its terms.
 For non-trivial changes, **open an issue first** describing:
 - What problem you're solving
 - The shape of the change (new provider? contract change? builtin tweak?)
-- Whether it would land in `@lattice/core` or as a separate provider package
+- Whether it would land in `@lzong.tw/lattice` or as a separate provider package
 
 Contract changes (anything modifying `lattice.d.ts`, `dispatcher.mjs`,
 `provider-registry.mjs`, `context.mjs`, `client-enum.mjs`, `timeouts.mjs`) are
@@ -34,7 +34,7 @@ pnpm run check
 
 Node 18+ is required.
 
-## What goes in `@lattice/core` vs your own package
+## What goes in `@lzong.tw/lattice` vs your own package
 
 **In core**: things every consumer needs — the dispatcher, the contract,
 the built-in protection / commit-gate / reminders / Serena / Semble providers.
@@ -64,7 +64,7 @@ custom notifications, project-specific guardrails). Ship them as
 Tests live in `__tests__/`. Three layers:
 
 1. **Unit tests** — pure functions, pure providers. Use the
-   `@lattice/core/testing` helpers (`mockContext`, `runProvider`,
+   `@lzong.tw/lattice/testing` helpers (`mockContext`, `runProvider`,
    `mockPayload`). Most provider work belongs here.
 2. **Dispatcher tests** — `dispatcher.test.ts` covers merge rules, validator
    semantics, client-aware rendering, timeout handling. Anything that changes
@@ -87,7 +87,7 @@ Tests live in `__tests__/`. Three layers:
 ## Reporting bugs
 
 Open an issue with:
-- lattice version (`@lattice/core` in your `package.json`)
+- lattice version (`@lzong.tw/lattice` in your `package.json`)
 - Node version
 - AI client (Claude Code / Copilot CLI / Codex CLI) and version
 - Minimal repro: ideally a stdin payload + the exact dispatcher invocation
