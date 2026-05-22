@@ -247,9 +247,13 @@ function smokePhase(options) {
     commands: [],
   };
 
+  const hasClaude = options.clients.includes("claude");
+  const postCompactClient = hasClaude ? "claude-code" : "codex";
+
   for (const client of options.clients) {
     phase.commands.push(`node hooks/verification/smoke-plan.mjs session-start ${client}`);
   }
+  phase.commands.push(`node hooks/verification/smoke-plan.mjs post-compact ${postCompactClient}`);
   for (const client of options.clients) {
     phase.commands.push(`node hooks/verification/smoke-plan.mjs pre-tool-deny ${client}`);
   }
@@ -319,6 +323,8 @@ function renderAgentsBlock(options) {
   for (const client of options.clients) {
     smokeCommands.push(`node hooks/verification/smoke-plan.mjs session-start ${client}`);
   }
+  const agentsPostCompactClient = options.clients.includes("claude") ? "claude-code" : "codex";
+  smokeCommands.push(`node hooks/verification/smoke-plan.mjs post-compact ${agentsPostCompactClient}`);
   if (options.providers.includes("serena")) {
     providerDocs.push("- Serena: `hooks/docs/SERENA-CLIENT-SETUP.md`");
   }
@@ -355,11 +361,11 @@ function claudeSettings() {
     hooks: {
       SessionStart: [
         {
-          matcher: "startup|resume",
+          matcher: "startup|resume|compact",
           hooks: [
             {
               type: "command",
-              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/session-start.mjs claude',
+              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/session-start.mjs claude-code',
               timeout: 15,
             },
           ],
@@ -371,7 +377,7 @@ function claudeSettings() {
           hooks: [
             {
               type: "command",
-              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/pre-tool-policy.mjs claude',
+              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/pre-tool-policy.mjs claude-code',
               timeout: 15,
             },
           ],
@@ -383,7 +389,7 @@ function claudeSettings() {
           hooks: [
             {
               type: "command",
-              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/post-tool-reminder.mjs claude',
+              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/post-tool-reminder.mjs claude-code',
               timeout: 15,
             },
           ],
@@ -435,6 +441,17 @@ function codexHooksJson() {
               type: "command",
               command: codexDispatcherCommand("session-start.mjs", "LATTICE_SESSION_KIND=resume"),
               statusMessage: "Recovering session context",
+              timeout: 15,
+            },
+          ],
+        },
+        {
+          matcher: "compact",
+          hooks: [
+            {
+              type: "command",
+              command: codexDispatcherCommand("session-start.mjs", "LATTICE_SESSION_KIND=compact"),
+              statusMessage: "Recovering compacted session context",
               timeout: 15,
             },
           ],
@@ -641,7 +658,9 @@ function copyPackageMountFromNodeModules(root) {
     force: true,
     filter(entry) {
       const parts = entry.slice(source.length).split(/[\\/]/).filter(Boolean);
-      return !parts.some((part) => [".git", "node_modules", "coverage", ".turbo"].includes(part));
+      return !parts.some((part) =>
+        [".git", ".serena", ".test-state", "node_modules", "coverage", ".turbo"].includes(part),
+      );
     },
   });
   return { copied: true };

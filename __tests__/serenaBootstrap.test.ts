@@ -35,7 +35,7 @@ describe("bootstrapSerena platform-agnostic launch", () => {
   it("spawns node (process.execPath) with start-http.mjs and the client name — never bash", () => {
     spawnSyncMock.mockReturnValue({ status: 0, error: undefined });
 
-    const exit = bootstrapSerena("claude");
+    const exit = bootstrapSerena("codex");
 
     expect(exit).toBe(0);
     expect(spawnSyncMock).toHaveBeenCalledOnce();
@@ -46,7 +46,7 @@ describe("bootstrapSerena platform-agnostic launch", () => {
     expect(command).not.toBe("bash");
     // First arg is the start-http.mjs path; second is the normalized client.
     expect(args[0]).toMatch(/start-http\.mjs$/);
-    expect(args[1]).toBe("claude");
+    expect(args[1]).toBe("codex");
   });
 
   it("returns 0 when client is unknown (no-op, never spawns)", () => {

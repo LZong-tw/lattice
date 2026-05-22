@@ -171,6 +171,7 @@ cmd.exe, and PowerShell because the assertions live in `node`, not the shell:
 ```
 node hooks/verification/smoke-plan.mjs session-start claude-code
 node hooks/verification/smoke-plan.mjs session-start codex
+node hooks/verification/smoke-plan.mjs post-compact claude-code
 node hooks/verification/smoke-plan.mjs pre-tool-deny claude-code
 node hooks/verification/smoke-plan.mjs pre-tool-deny codex
 ```
@@ -191,6 +192,7 @@ node --check hooks/codex-hook-runner.mjs
 node --check hooks/pre-tool-policy.mjs
 node hooks/verification/smoke-plan.mjs session-start claude-code
 node hooks/verification/smoke-plan.mjs session-start codex
+node hooks/verification/smoke-plan.mjs post-compact claude-code
 node hooks/verification/smoke-plan.mjs pre-tool-deny claude-code
 node hooks/verification/smoke-plan.mjs pre-tool-deny codex
 ```
@@ -225,7 +227,8 @@ rtk --version  # if LATTICE_REQUIRE_RTK=1
 - If a `PreToolUse` hook exits 1, reproduce it with the exact smoke command
   above and isolate the shared layer with `LATTICE_PROVIDER=none`.
 - If a `PostCompact` hook is added by a provider, it must write valid JSON to
-  stdout. Empty stdout is invalid; output `{}` when there is no update.
+  stdout and must not inject context. Output `{}`; use `SessionStart` with the
+  `compact` matcher for post-compaction context re-injection.
 - Do not set `LATTICE_REQUIRE_SERENA_MCP`, `LATTICE_REQUIRE_SEMBLE_MCP`, or
   `LATTICE_REQUIRE_RTK` until the corresponding client/provider config has been
   installed and smoke-tested.
@@ -414,11 +417,11 @@ and a smoke test.
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
+        "matcher": "startup|resume|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/session-start.mjs claude",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/session-start.mjs claude-code",
             "timeout": 15
           }
         ]
@@ -430,7 +433,7 @@ and a smoke test.
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/pre-tool-policy.mjs claude",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/pre-tool-policy.mjs claude-code",
             "timeout": 15
           }
         ]
@@ -442,7 +445,7 @@ and a smoke test.
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/post-tool-reminder.mjs claude",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/post-tool-reminder.mjs claude-code",
             "timeout": 15
           }
         ]
@@ -467,6 +470,7 @@ and a smoke test.
 
 ```
 node hooks/verification/smoke-plan.mjs session-start claude-code
+node hooks/verification/smoke-plan.mjs post-compact claude-code
 node hooks/verification/smoke-plan.mjs pre-tool-deny claude-code
 ```
 
@@ -561,6 +565,17 @@ from the hook payload `cwd` and then forwards stdin to the real hook script.
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "LATTICE_SESSION_KIND=compact LATTICE_HOOK_TARGET=session-start.mjs LATTICE_HOOK_CLIENT=codex node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
+            "statusMessage": "Recovering compacted session context",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -584,6 +599,7 @@ from the hook payload `cwd` and then forwards stdin to the real hook script.
 
 ```
 node hooks/verification/smoke-plan.mjs session-start codex
+node hooks/verification/smoke-plan.mjs post-compact codex
 node hooks/verification/smoke-plan.mjs pre-tool-deny codex
 ```
 
@@ -900,7 +916,7 @@ On Windows, run them under Git Bash, WSL, or rewrite as PowerShell
 ```bash
 # First isolate the shared hook layer:
 echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
-  | env LATTICE_PROVIDER=none node hooks/pre-tool-policy.mjs claude
+  | env LATTICE_PROVIDER=none node hooks/pre-tool-policy.mjs claude-code
 # => Should exit 0
 
 echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
@@ -912,7 +928,7 @@ If the isolated command passes, re-enable providers one at a time:
 
 ```bash
 echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
-  | env LATTICE_PROVIDER=serena node hooks/pre-tool-policy.mjs claude
+  | env LATTICE_PROVIDER=serena node hooks/pre-tool-policy.mjs claude-code
 
 echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
   | env LATTICE_PROVIDER=rtk node hooks/pre-tool-policy.mjs codex
@@ -922,8 +938,9 @@ Then fix the provider-specific config or unset that provider until it is ready.
 
 ### `PostCompact hook returned invalid PostCompact hook JSON output`
 
-**Cause:** a PostCompact hook wrote empty stdout or non-JSON text. PostCompact
-hooks must write valid JSON.
+**Cause:** a PostCompact hook wrote empty stdout, non-JSON text, or a context
+injection payload. PostCompact hooks must write valid JSON and should not inject
+context.
 
 Provider rule:
 
@@ -931,8 +948,9 @@ Provider rule:
 {}
 ```
 
-Output `{}` when there is no context update. Write diagnostics to stderr, not
-stdout.
+Output `{}`. Write diagnostics to stderr, not stdout. If the provider needs to
+re-inject context after compaction, wire that behavior through `SessionStart`
+with the `compact` matcher instead of `PostCompact`.
 
 ### Codex warns `[features].codex_hooks` is deprecated
 
@@ -997,7 +1015,7 @@ node hooks/verification/smoke-plan.mjs session-start claude-code
 ```bash
 # Verify the client arg is passed:
 echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' \
-  | node hooks/pre-tool-policy.mjs claude
+  | node hooks/pre-tool-policy.mjs claude-code
 # => Must output JSON with "permissionDecision":"deny"
 # If it doesn't, check that the config passes the client name as the first arg.
 ```

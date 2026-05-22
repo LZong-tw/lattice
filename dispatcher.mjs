@@ -46,9 +46,9 @@ export const PERMISSION_DECISIONS = Object.freeze({
 });
 
 /**
- * Stop / PostCompact hookSpecificOutput.decision literal that blocks the
- * client from declaring the turn complete. Use this constant when emitting
- * a blocking Stop result.
+ * Stop hookSpecificOutput.decision literal that blocks the client from
+ * declaring the turn complete. Use this constant when emitting a blocking
+ * Stop result.
  */
 export const STOP_DECISIONS = Object.freeze({
   BLOCK: "block",
@@ -185,10 +185,13 @@ function renderResponseJson(event, merged, client) {
     return renderPreOrPostToolUse(event, merged, client);
   }
 
+  if (event === EVENT_NAMES.PostCompact) {
+    return {};
+  }
+
   if (
     event === EVENT_NAMES.Stop ||
-    event === EVENT_NAMES.SessionStart ||
-    event === EVENT_NAMES.PostCompact
+    event === EVENT_NAMES.SessionStart
   ) {
     const response = {};
     if (typeof merged.additionalContext === "string" && merged.additionalContext.length > 0) {
@@ -199,9 +202,6 @@ function renderResponseJson(event, merged, client) {
         hookEventName: event,
         ...merged.hookSpecificOutput,
       };
-    }
-    if (event === EVENT_NAMES.PostCompact) {
-      return response;
     }
     return Object.keys(response).length > 0 ? response : null;
   }

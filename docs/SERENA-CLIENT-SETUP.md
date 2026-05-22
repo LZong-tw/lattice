@@ -95,7 +95,7 @@ The process is **detached** and writes state files to the runtime directory.
 ### Claude Code + Serena
 
 The base hooks config in `.claude/settings.json` (see [README](../README.md#claude-code-config))
-already calls `session-start.mjs claude`, which triggers Serena bootstrap
+already calls `session-start.mjs claude-code`, which triggers Serena bootstrap
 automatically.
 
 **Additional MCP config surface** — add Serena as a stdio MCP server so Claude
@@ -129,7 +129,7 @@ If Claude Code does not launch the MCP command from the repo root, replace
 **Smoke test:**
 
 ```bash
-echo '{}' | node hooks/session-start.mjs claude
+echo '{}' | node hooks/session-start.mjs claude-code
 # => stderr: "Serena claude is ready at http://127.0.0.1:9122/mcp (PID ...)"
 #    OR "Serena already listening on 127.0.0.1:9122 for claude."
 #    exit: 0
@@ -137,7 +137,7 @@ echo '{}' | node hooks/session-start.mjs claude
 curl -sf http://127.0.0.1:9122/mcp -o /dev/null && echo "OK" || echo "FAIL"
 # => OK
 
-printf '{}\n' | env LATTICE_REQUIRE_SERENA_MCP=1 node hooks/session-start.mjs claude
+printf '{}\n' | env LATTICE_REQUIRE_SERENA_MCP=1 node hooks/session-start.mjs claude-code
 # => exit: 0
 ```
 
@@ -315,7 +315,7 @@ lsof -i :9122
 kill <PID>
 
 # Restart:
-echo '{}' | node hooks/session-start.mjs claude
+echo '{}' | node hooks/session-start.mjs claude-code
 ```
 
 ### `curl` to MCP endpoint times out or connection refused

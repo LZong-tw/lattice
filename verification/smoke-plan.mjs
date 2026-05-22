@@ -31,6 +31,7 @@ function usage() {
   return [
     "Usage:",
     "  node hooks/verification/smoke-plan.mjs session-start <client>",
+    "  node hooks/verification/smoke-plan.mjs post-compact <client>",
     "  node hooks/verification/smoke-plan.mjs pre-tool-deny <client>",
   ].join("\n");
 }
@@ -97,6 +98,26 @@ async function checkSessionStart(client) {
   }
 }
 
+async function checkPostCompact(client) {
+  const result = await runHook({
+    script: "session-start.mjs",
+    client,
+    stdin: '{"hook_event_name":"PostCompact"}\n',
+    env: { LATTICE_PROVIDER: "none" },
+  });
+  if (result.code !== 0) {
+    fail(
+      `post-compact ${client} exited ${result.code}` +
+        (result.stderr ? `: ${result.stderr.trim()}` : ""),
+    );
+  }
+  if (result.stdout.trim() !== "{}") {
+    fail(
+      `post-compact ${client} expected stdout "{}", got: ${result.stdout.slice(0, 200)}`,
+    );
+  }
+}
+
 async function checkPreToolDeny(client) {
   const result = await runHook({
     script: "pre-tool-policy.mjs",
@@ -127,6 +148,9 @@ async function main() {
   switch (check) {
     case "session-start":
       await checkSessionStart(client);
+      break;
+    case "post-compact":
+      await checkPostCompact(client);
       break;
     case "pre-tool-deny":
       await checkPreToolDeny(client);

@@ -15,6 +15,16 @@ import "./register-builtins.mjs";
 const payload = await readJsonStdin();
 const client = process.argv[2];
 
+if (payload.hook_event_name === EVENT_NAMES.PostCompact) {
+  try {
+    process.exit(await dispatch(EVENT_NAMES.PostCompact, payload, { client }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`lattice: PostCompact dispatch error: ${message}\n`);
+    process.exit(1);
+  }
+}
+
 const sessionKind =
   process.env.LATTICE_SESSION_KIND?.trim().toLowerCase() ||
   (typeof payload.matcher === "string" ? payload.matcher.toLowerCase() : "") ||

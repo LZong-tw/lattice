@@ -36,7 +36,7 @@ Smoke test:
 uvx --version
 # => exits 0
 
-printf '{}\n' | env LATTICE_REQUIRE_SEMBLE_MCP=1 node hooks/session-start.mjs claude
+printf '{}\n' | env LATTICE_REQUIRE_SEMBLE_MCP=1 node hooks/session-start.mjs claude-code
 # => exit: 0
 ```
 

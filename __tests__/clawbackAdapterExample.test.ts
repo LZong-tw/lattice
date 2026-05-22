@@ -127,14 +127,13 @@ describe("clawback adapter example — Stop (stop-verify)", () => {
 });
 
 describe("clawback adapter example — PostCompact (post-compact-reinject)", () => {
-  it("returns additionalContext describing the re-injection", async () => {
+  it("returns empty JSON because PostCompact cannot inject context", async () => {
     const { result } = await runProvider(
       clawbackProvider,
       "PostCompact",
       mockPayload.postCompact(),
     );
-    expect(typeof result.additionalContext).toBe("string");
-    expect(result.additionalContext).toContain("git status");
+    expect(result).toEqual({});
   });
 });
 

@@ -44,9 +44,9 @@ function runHook(
 
 const consumerConfigFixtures = {
   claude: {
-    sessionStart: 'node "$CLAUDE_PROJECT_DIR"/hooks/session-start.mjs claude',
-    preToolUse: 'node "$CLAUDE_PROJECT_DIR"/hooks/pre-tool-policy.mjs claude',
-    postToolUse: 'node "$CLAUDE_PROJECT_DIR"/hooks/post-tool-reminder.mjs claude',
+    sessionStart: 'node "$CLAUDE_PROJECT_DIR"/hooks/session-start.mjs claude-code',
+    preToolUse: 'node "$CLAUDE_PROJECT_DIR"/hooks/pre-tool-policy.mjs claude-code',
+    postToolUse: 'node "$CLAUDE_PROJECT_DIR"/hooks/post-tool-reminder.mjs claude-code',
     stop: 'node "$CLAUDE_PROJECT_DIR"/hooks/stop-checklist.mjs',
   },
   copilot: {
@@ -73,6 +73,27 @@ describe("consumer path contract", () => {
     expect(consumerConfigFixtures.codex.sessionStart).toContain("session-start.mjs");
     expect(consumerConfigFixtures.codex.preToolUse).toContain("hooks/codex-hook-runner.mjs");
     expect(consumerConfigFixtures.codex.preToolUse).toContain("pre-tool-policy.mjs");
+  });
+});
+
+describe("runtime process contract", () => {
+  it("does not use Node's deprecated shell:true child process mode", () => {
+    const runtimeFiles = [
+      "codex-hook-runner.mjs",
+      "commit-checkpoint.mjs",
+      "doctor.mjs",
+      "serena/bootstrap.mjs",
+      "serena/open-dashboard.mjs",
+      "serena/start-http.mjs",
+      "rtk/provider.mjs",
+      "verification/detect-stack.mjs",
+      "verification/verify.mjs",
+    ];
+
+    for (const file of runtimeFiles) {
+      const source = readFileSync(resolve(packageRoot, file), "utf8");
+      expect(source, file).not.toMatch(/\bshell\s*:\s*true\b/);
+    }
   });
 });
 
@@ -129,7 +150,7 @@ describe("hook entry-point behavior", () => {
   });
 
   it("denies shell git commit for Claude and Codex hooks", () => {
-    for (const client of ["claude", "codex"]) {
+    for (const client of ["claude-code", "codex"]) {
       const result = runHook("pre-tool-policy.mjs", client, {
         tool_name: "Bash",
         tool_input: { command: "git commit -m test" },
@@ -148,11 +169,11 @@ describe("hook entry-point behavior", () => {
   });
 
   it("emits Claude-only reminder hooks without blocking", () => {
-    const screenshot = runHook("pre-tool-policy.mjs", "claude", {
+    const screenshot = runHook("pre-tool-policy.mjs", "claude-code", {
       tool_name: "mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot",
       tool_input: {},
     });
-    const postEdit = runHook("post-tool-reminder.mjs", "claude", {
+    const postEdit = runHook("post-tool-reminder.mjs", "claude-code", {
       tool_name: "Edit",
       tool_input: {},
     });
@@ -165,7 +186,7 @@ describe("hook entry-point behavior", () => {
 
   it("denies AI edits to environment files", () => {
     const root = mkdtempSync(join(tmpdir(), "lattice-protect-env-"));
-    const result = runHook("pre-tool-policy.mjs", "claude", {
+    const result = runHook("pre-tool-policy.mjs", "claude-code", {
       tool_name: "Edit",
       tool_input: { file_path: join(root, ".env") },
     });
@@ -186,7 +207,7 @@ describe("hook entry-point behavior", () => {
     writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: {} }), "utf8");
     writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n", "utf8");
 
-    const result = runHook("pre-tool-policy.mjs", "claude", {
+    const result = runHook("pre-tool-policy.mjs", "claude-code", {
       tool_name: "Write",
       tool_input: { file_path: join(root, "pnpm-lock.yaml") },
     });
@@ -206,7 +227,7 @@ describe("hook entry-point behavior", () => {
     const root = mkdtempSync(join(tmpdir(), "lattice-stop-no-stack-"));
     const result = runHook(
       "stop-checklist.mjs",
-      "claude",
+      "claude-code",
       { cwd: root, session_id: "test-session" },
       { LATTICE_VERIFY_ON_STOP: "1" },
     );
@@ -337,23 +358,26 @@ describe("Serena provider contracts", () => {
     expect(source).toContain("getClientPaths");
   });
 
-  it("shared Serena helper passes shell:true for uvx on Windows so uvx.cmd shims work", () => {
+  it("shared Serena helper routes uvx through cmd.exe on Windows so uvx.cmd shims work", () => {
     // Regression guard: Node refuses to spawn `uvx.cmd` (Scoop/winget/pip)
-    // without a shell. Both the spawnSync version probe and the detached
-    // spawn() launch must opt into shell on win32.
+    // directly. The runtime forbids `shell: true`, so both the spawnSync
+    // version probe and the detached spawn() launch must wrap uvx in
+    // `cmd.exe /c` on win32 instead.
     const source = readFileSync(resolve(packageRoot, "serena/start-http.mjs"), "utf8");
 
     expect(source).toContain('process.platform === "win32"');
-    // The `isWindows` flag must be threaded into both the version check and
-    // the detached launcher spawn.
-    expect(source).toMatch(/spawnSync\("uvx",[\s\S]*?shell: isWindows/);
-    expect(source).toMatch(/spawn\("uvx",[\s\S]*?shell: isWindows/);
+    expect(source).toContain('cmd.exe');
+    expect(source).toMatch(/cmd\.exe[\s\S]*?["']\/c["'][\s\S]*?["']uvx["']/);
+    expect(source).not.toMatch(/\bshell\s*:\s*true\b/);
+    expect(source).not.toMatch(/\bshell\s*:\s*isWindows\b/);
   });
 
-  it("doctor uses shell:true on Windows for the uvx availability probe", () => {
+  it("doctor routes uvx through cmd.exe on Windows for the availability probe", () => {
     const source = readFileSync(resolve(packageRoot, "doctor.mjs"), "utf8");
 
-    expect(source).toMatch(/spawnSync\("uvx",[\s\S]*?shell: process\.platform === "win32"/);
+    expect(source).toContain('process.platform === "win32"');
+    expect(source).toMatch(/cmd\.exe[\s\S]*?["']\/c["'][\s\S]*?["']uvx["']/);
+    expect(source).not.toMatch(/\bshell\s*:\s*true\b/);
   });
 
   it.each(expectedLaunchers)(

@@ -122,14 +122,10 @@ export const clawbackProvider = {
     },
 
     // ── PostCompact ───────────────────────────────────────────────────
-    // Real impl: hooks/post-compact-reinject.cjs. Re-injects current git
-    // status + the project's gotchas.md + any CLAUDE.md so the post-
-    // compaction context still includes the project-specific guardrails
-    // that were summarised away. Returned as `additionalContext`.
+    // PostCompact is side-effect-only in current Claude/Codex hook schemas.
+    // Re-injection should run through SessionStart's compact matcher instead.
     PostCompact(_ctx, _payload) {
-      return {
-        additionalContext: "clawback: would re-inject git status + docs here",
-      };
+      return {};
     },
 
     // ── Notification ──────────────────────────────────────────────────

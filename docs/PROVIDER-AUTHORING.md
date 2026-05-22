@@ -85,7 +85,7 @@ type LatticeHandler = (
 interface LatticeHandlerResult {
   decision?: "allow" | "deny";              // PreToolUse / PostToolUse
   reason?: string;                          // required when decision === "deny"
-  additionalContext?: string;               // Stop / SessionStart / PostCompact
+  additionalContext?: string;               // Stop / SessionStart
   hookSpecificOutput?: Record<string, unknown>;  // pass-through
   exitCode?: number;                        // non-zero exits the dispatch
 }
@@ -226,7 +226,8 @@ dispatcher renders:
 | Event | Claude Code / Codex | GitHub Copilot CLI |
 |---|---|---|
 | `PreToolUse` / `PostToolUse` | nested `{ hookSpecificOutput: { hookEventName, permissionDecision, permissionDecisionReason } }` | flat `{ permissionDecision, permissionDecisionReason }` |
-| `Stop` / `SessionStart` / `PostCompact` | `{ additionalContext, hookSpecificOutput? }` | same as Claude (Copilot doesn't have these events) |
+| `Stop` / `SessionStart` | `{ additionalContext, hookSpecificOutput? }` | same as Claude (Copilot doesn't have these events) |
+| `PostCompact` | `{}` only; use a `SessionStart` compact hook for context re-injection | same as Claude |
 | `Notification` and any other | (no stdout) | (no stdout) |
 
 If your provider should never run on a particular client, set

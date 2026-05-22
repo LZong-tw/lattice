@@ -74,9 +74,9 @@ Published as `@lattice/clawback` on npm with:
 - **PostToolUse** and **Notification** are side-effect-only events. The
   v1 dispatcher emits no stdout JSON when the merged result is empty,
   which matches clawback's existing behavior.
-- **PostCompact** is the only event with no built-in lattice handlers
-  in v1; clawback is the motivating consumer, so this example doubles
-  as the canonical PostCompact usage.
+- **PostCompact** is side-effect-only in current Claude/Codex hook schemas.
+  Clawback-style context re-injection should use `SessionStart` with the
+  `compact` matcher instead.
 
 ## What's intentionally missing
 

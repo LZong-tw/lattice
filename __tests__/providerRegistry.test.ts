@@ -104,7 +104,7 @@ describe("bootstrapProviders", () => {
     const onError = vi.fn();
     const serena = vi.fn().mockResolvedValue(0);
 
-    const code = await bootstrapProviders("claude", {
+    const code = await bootstrapProviders("claude-code", {
       env: { LATTICE_PROVIDER: "ghost" },
       registry: createRegistry({ serena }),
       onError,
@@ -135,7 +135,7 @@ describe("bootstrapProviders", () => {
   it("surfaces explicit provider bootstrap failures", async () => {
     const onError = vi.fn();
 
-    const code = await bootstrapProviders("claude", {
+    const code = await bootstrapProviders("claude-code", {
       env: { LATTICE_PROVIDER: "serena" },
       registry: createRegistry({
         serena: vi.fn().mockRejectedValue(new Error("boom")),

@@ -699,6 +699,24 @@ describe("dispatch — client-aware rendering", () => {
 });
 
 describe("dispatch — PostCompact round-trip", () => {
+  it("emits empty JSON even when no provider handles PostCompact", async () => {
+    const streams = captureStreams();
+    const code = await dispatch(
+      EVENT_NAMES.PostCompact,
+      {},
+      {
+        client: "claude-code",
+        env: { ...baseEnv },
+        stdout: streams.write,
+        stderr: streams.err,
+      },
+    );
+
+    expect(code).toBe(0);
+    const out = JSON.parse(streams.stdout.join("").trim());
+    expect(out).toEqual({});
+  });
+
   it("emits empty JSON when no PostCompact provider adds context", async () => {
     registerProvider({
       name: "noop-postcompact",
@@ -725,7 +743,7 @@ describe("dispatch — PostCompact round-trip", () => {
     expect(out).toEqual({});
   });
 
-  it("renders additionalContext from a PostCompact handler", async () => {
+  it("drops additionalContext from PostCompact handlers because the event cannot inject context", async () => {
     registerProvider({
       name: "reinjector",
       contractVersion: 1,
@@ -748,7 +766,7 @@ describe("dispatch — PostCompact round-trip", () => {
 
     expect(code).toBe(0);
     const out = JSON.parse(streams.stdout.join("").trim());
-    expect(out.additionalContext).toBe("git status: clean");
+    expect(out).toEqual({});
   });
 });
 

@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -131,9 +132,78 @@ describe("lattice init install plan", () => {
     expect(JSON.parse(readFileSync(join(root, ".claude/settings.json"), "utf8")).hooks.SessionStart[0].hooks[0].command).toContain(
       "hooks/session-start.mjs claude",
     );
+    expect(JSON.parse(readFileSync(join(root, ".claude/settings.json"), "utf8")).hooks.SessionStart[0].matcher).toBe("startup|resume|compact");
     expect(readFileSync(join(root, ".codex/config.toml"), "utf8")).toContain("hooks = true");
+    const codexHooks = JSON.parse(readFileSync(join(root, ".codex/hooks.json"), "utf8"));
     expect(readFileSync(join(root, ".codex/hooks.json"), "utf8")).toContain("codex-hook-runner.mjs");
+    expect(codexHooks.hooks.SessionStart.map((entry: { matcher: string }) => entry.matcher)).toContain("compact");
     expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toContain("lattice:init:v1");
+  });
+
+  it("runs required hook smokes from an applied consumer repo", () => {
+    const root = tempRepo();
+    // mount:"copy" sources from <root>/node_modules/@lzong.tw/lattice. Simulate
+    // an npm install by copying the package source into that path first.
+    const packageRoot = resolve(process.cwd());
+    const nodeModulesPkg = join(root, "node_modules", "@lzong.tw", "lattice");
+    mkdirSync(nodeModulesPkg, { recursive: true });
+    cpSync(packageRoot, nodeModulesPkg, {
+      recursive: true,
+      filter(entry) {
+        const parts = entry.slice(packageRoot.length).split(/[\\/]/).filter(Boolean);
+        return !parts.some((p) =>
+          [".git", ".serena", ".test-state", "node_modules", "coverage", ".turbo"].includes(p),
+        );
+      },
+    });
+
+    applyInstallPlan({
+      consumerRoot: root,
+      clients: ["claude", "codex"],
+      providers: [],
+      mount: "copy",
+      latticeRepoUrl: "<lattice-repo-url>",
+      format: "markdown",
+      write: true,
+    });
+
+    const runHook = (script: string, client: string, input: string, env: Record<string, string> = {}) =>
+      spawnSync(process.execPath, [join(root, "hooks", script), client], {
+        cwd: root,
+        input,
+        encoding: "utf8",
+        env: { ...process.env, ...env },
+      });
+
+    for (const client of ["claude-code", "codex"]) {
+      const result = runHook("session-start.mjs", client, "{}\n", { LATTICE_PROVIDER: "none" });
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+    }
+
+    const postCompact = runHook("session-start.mjs", "claude-code", '{"hook_event_name":"PostCompact"}\n', {
+      LATTICE_PROVIDER: "none",
+    });
+    expect(postCompact.error).toBeUndefined();
+    expect(postCompact.status).toBe(0);
+    expect(postCompact.stdout.trim()).toBe("{}");
+
+    const preTool = runHook(
+      "pre-tool-policy.mjs",
+      "claude-code",
+      '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}',
+      { LATTICE_PROVIDERS: "lattice/protection" },
+    );
+    expect(preTool.error).toBeUndefined();
+    expect(preTool.status).toBe(0);
+    expect(JSON.parse(preTool.stdout)).toEqual(
+      expect.objectContaining({
+        hookSpecificOutput: expect.objectContaining({
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+        }),
+      }),
+    );
   });
 
   it("writes provider MCP config that satisfies Serena and Semble startup guards", () => {

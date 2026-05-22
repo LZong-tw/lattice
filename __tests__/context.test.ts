@@ -26,7 +26,7 @@ describe("createContext", () => {
   it("returns a frozen ctx with normalized client and contract version 1", () => {
     const xdg = makeXdgDir();
     const { ctx, dispose } = createContext({
-      client: "claude",
+      client: "CLAUDE-CODE",
       event: "PreToolUse",
       providerName: "test",
       env: { XDG_STATE_HOME: xdg },

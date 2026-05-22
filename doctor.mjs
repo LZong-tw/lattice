@@ -137,15 +137,17 @@ try {
 }
 
 // --- Optional: uvx availability ---
-// On Windows, uvx ships as `uvx.cmd` (Scoop/winget/pip). Node refuses to
-// spawn .cmd shims without a shell, so we opt into shell on win32 only.
-// POSIX doesn't need it and enabling it everywhere would change argument
-// escaping semantics.
-const uvxResult = spawnSync("uvx", ["--version"], {
+// On Windows, uvx ships as `uvx.cmd` (Scoop/winget/pip). Node cannot spawn
+// .cmd shims directly; route through cmd.exe /c instead of enabling the
+// shell option (the codebase forbids that flag for argument-escape sanity).
+const uvxCommand =
+  process.platform === "win32"
+    ? { command: "cmd.exe", args: ["/c", "uvx", "--version"] }
+    : { command: "uvx", args: ["--version"] };
+const uvxResult = spawnSync(uvxCommand.command, uvxCommand.args, {
   encoding: "utf8",
   stdio: ["ignore", "pipe", "pipe"],
   timeout: 10_000,
-  shell: process.platform === "win32",
 });
 
 if (!uvxResult.error && uvxResult.status === 0) {
