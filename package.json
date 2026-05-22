@@ -110,11 +110,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lzong-tw/lattice.git"
+    "url": "git+https://github.com/LZong-tw/lattice.git"
   },
-  "homepage": "https://github.com/lzong-tw/lattice#readme",
+  "homepage": "https://github.com/LZong-tw/lattice#readme",
   "bugs": {
-    "url": "https://github.com/lzong-tw/lattice/issues"
+    "url": "https://github.com/LZong-tw/lattice/issues"
   },
   "keywords": [
     "claude-code",
