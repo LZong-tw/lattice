@@ -18,10 +18,10 @@ function tempRepo() {
 }
 
 describe("lattice init install plan", () => {
-  it("keeps public npm publishing disabled by default", () => {
+  it("is configured to publish publicly to npm with provenance", () => {
     const pkg = JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf8"));
-    expect(pkg.publishConfig).toBeUndefined();
-    expect(pkg.scripts.prepublishOnly).toContain("LATTICE_ALLOW_PUBLISH");
+    expect(pkg.publishConfig).toEqual({ access: "public", provenance: true });
+    expect(pkg.scripts.prepublishOnly).not.toContain("LATTICE_ALLOW_PUBLISH");
   });
 
   it("detects missing mount and client config without writing to the consumer repo", () => {
