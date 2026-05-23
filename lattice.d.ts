@@ -268,3 +268,66 @@ export const mockPayload: Readonly<{
   postCompact(overrides?: Record<string, unknown>): Record<string, unknown>;
   notification(overrides?: Record<string, unknown>): Record<string, unknown>;
 }>;
+
+// ---------------------------------------------------------------------------
+// lessons (subpath: "@lzong.tw/lattice/lessons/*")
+// ---------------------------------------------------------------------------
+
+/**
+ * One domain mapping for the lattice/lessons provider. Files matching
+ * `match` (regex string applied to repo-relative paths, normalised to
+ * forward slashes) are associated with the per-domain doc at `doc`.
+ * An optional `trigger` regex narrows the association by requiring the
+ * file's contents to match — useful when the path regex is broad.
+ */
+export interface LessonsDomain {
+  name: string;
+  match: string;
+  doc: string;
+  trigger?: string;
+}
+
+/**
+ * Resolved config returned by `loadLessonsConfig`. All fields are always
+ * present after merging with built-in defaults.
+ */
+export interface LessonsConfig {
+  rootDoc: string;
+  cap: {
+    lines: number;
+    bullets: number;
+  };
+  domains: LessonsDomain[];
+  auditScopes: string[];
+  writeGate: {
+    enabled: boolean;
+    watchPaths: string[];
+    requireDocsUpdate: string[];
+    bypassToken: string;
+  };
+}
+
+export function loadLessonsConfig(opts: {
+  env: Readonly<Record<string, string | undefined>>;
+  repoRoot: string;
+}): LessonsConfig;
+
+export function buildSizeCheckMessage(opts: {
+  repoRoot: string;
+  config: LessonsConfig;
+}): string | null;
+
+export function buildResurfaceMessage(opts: {
+  repoRoot: string;
+  filePaths: string[];
+  config: LessonsConfig;
+}): string | null;
+
+export function evaluateWriteGate(opts: {
+  command: string;
+  repoRoot: string;
+  config: LessonsConfig;
+}): { block: true; reason: string } | null;
+
+/** The `lattice/lessons` v1 provider, exported for explicit registration. */
+export const lessonsProvider: LatticeProvider;

@@ -5,6 +5,45 @@ All notable changes to `@lzong.tw/lattice` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-05-23
+
+### Added
+
+- **Lessons provider** (`lessons/`): new built-in provider for managing
+  the accumulating-prose-rules problem in long-lived repos. Three opt-in
+  layers with progressively stronger enforcement:
+  - **Stop hook** — terse warning when `CLAUDE.md` (or configured
+    `rootDoc`) grows past `cap.lines` / `cap.bullets`. Zero-config
+    default; always non-blocking.
+  - **PostToolUse Edit/Write** — when a touched file falls into a
+    configured `domains[]` entry, prints a one-line nudge naming the
+    per-domain doc to read. No-op when `domains` is empty.
+  - **PreToolUse `git commit` write-gate** — opt-in via
+    `writeGate.enabled: true`. Blocks commits that touch `watchPaths`
+    without also editing `requireDocsUpdate`, unless the commit
+    message contains `bypassToken` (default `[no-decision]`).
+- **CLI scanners** for ongoing maintenance:
+  - `lessons/reorganize-audit.mjs` — finds root-doc lessons that match
+    a configured domain and should move to a per-domain file.
+  - `lessons/promote-audit.mjs` — scores lessons by promotability
+    heuristics (imperative keywords, regex-able references, real
+    incident citations) and suggests an enforcement layer for each.
+    `--open-issues` opens GitHub tracking issues via `gh issue create`
+    using `--body-file` + `execFileSync` argv (shell-injection safe).
+- **Config schema** (`lessons/config.mjs`): resolved from
+  `LATTICE_LESSONS_CONFIG` env, `.lattice/lessons.config.json`, or
+  `lattice.config.json#lessons`. All fields optional; defaults are
+  conservative (size-check only, no domains, write-gate disabled).
+- **Type declarations** (`lattice.d.ts`): `LessonsConfig`,
+  `LessonsDomain`, `lessonsProvider`, plus pure-fn signatures
+  (`loadLessonsConfig`, `buildSizeCheckMessage`,
+  `buildResurfaceMessage`, `evaluateWriteGate`) so consumers can
+  compose the building blocks into their own husky / CI scripts.
+- **Documentation**: new `docs/lessons.md` with rationale, config
+  reference, recipes (husky pre-commit wiring, GitHub Actions
+  push-trigger workflow, optional Stop-hook chain), and the
+  shell-injection lesson behind the `--body-file` pattern.
+
 ## [0.1.0] — 2026-05-21
 
 First public release.
