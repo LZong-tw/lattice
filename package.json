@@ -75,11 +75,26 @@
       "types": "./lattice.d.ts",
       "import": "./lessons/config.mjs"
     },
-    "./lessons/size-check": "./lessons/size-check.mjs",
-    "./lessons/resurface": "./lessons/resurface.mjs",
-    "./lessons/write-gate": "./lessons/write-gate.mjs",
-    "./lessons/reorganize-audit": "./lessons/reorganize-audit.mjs",
-    "./lessons/promote-audit": "./lessons/promote-audit.mjs",
+    "./lessons/size-check": {
+      "types": "./lattice.d.ts",
+      "import": "./lessons/size-check.mjs"
+    },
+    "./lessons/resurface": {
+      "types": "./lattice.d.ts",
+      "import": "./lessons/resurface.mjs"
+    },
+    "./lessons/write-gate": {
+      "types": "./lattice.d.ts",
+      "import": "./lessons/write-gate.mjs"
+    },
+    "./lessons/reorganize-audit": {
+      "types": "./lattice.d.ts",
+      "import": "./lessons/reorganize-audit.mjs"
+    },
+    "./lessons/promote-audit": {
+      "types": "./lattice.d.ts",
+      "import": "./lessons/promote-audit.mjs"
+    },
     "./common": "./common.mjs",
     "./session-start": "./session-start.mjs",
     "./provider-registry": "./provider-registry.mjs",

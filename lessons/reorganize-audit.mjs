@@ -24,6 +24,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { loadLessonsConfig } from "./config.mjs";
 
@@ -156,4 +157,12 @@ function run() {
   process.stdout.write(renderMarkdown(report) + "\n");
 }
 
-run();
+// IMPORTANT: only run as CLI when invoked directly. `promote-audit.mjs`
+// imports `extractLessons` from this module — without this guard, the
+// import would execute `run()` as a side effect and corrupt the
+// importer's stdout. The same pattern protects `size-check.mjs`.
+const invokedAsScript =
+  process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (invokedAsScript) {
+  run();
+}

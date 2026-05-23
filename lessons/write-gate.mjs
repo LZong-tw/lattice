@@ -53,6 +53,47 @@ function listStagedFiles(repoRoot) {
 }
 
 /**
+ * Modified tracked files that would be auto-staged by `git commit -a` /
+ * `--all` / `-am`. PreToolUse fires BEFORE git runs, so at gate-eval
+ * time the index is still empty for these — we must read the working-
+ * tree diff against HEAD instead. Untracked files are NOT included
+ * because `git commit -a` doesn't stage them either.
+ */
+function listAutoStagedFiles(repoRoot) {
+  try {
+    return execSync("git diff --name-only", {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Detect `git commit -a`, `--all`, `-am`, `-Sa`, etc — any short-flag
+ * cluster containing `a` or the long form `--all`. Returns true if
+ * the commit would auto-stage modified tracked files.
+ */
+function usesAllFlag(command) {
+  if (typeof command !== "string") return false;
+  if (/\s--all(\s|$|=)/.test(command)) return true;
+  // Short-flag clusters: any token starting with single `-` (not `--`)
+  // that contains `a`. Skip `-am` value-bearing forms by matching the
+  // flag cluster itself, not anything that comes after a space.
+  for (const token of command.split(/\s+/)) {
+    if (token.startsWith("-") && !token.startsWith("--") && /a/.test(token)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Best-effort extraction of the commit message from a `git commit`
  * command line. Supports:
  *   - `git commit -m "msg"`        / `git commit -m 'msg'`
@@ -109,13 +150,22 @@ export function evaluateWriteGate({ command, repoRoot, config }) {
     .map((s) => tryRegex(s))
     .filter(Boolean);
 
-  const staged = listStagedFiles(repoRoot);
-  if (staged.length === 0) return null;
+  // `git commit -a` / `--all` / `-am` auto-stages modified tracked
+  // files when git actually runs. PreToolUse fires BEFORE git, so we
+  // must also count working-tree-modified tracked files (not just the
+  // current index) — otherwise `git commit -am "..."` bypasses the
+  // gate when the user staged nothing manually.
+  const checkSet = new Set(listStagedFiles(repoRoot));
+  if (usesAllFlag(command)) {
+    for (const file of listAutoStagedFiles(repoRoot)) checkSet.add(file);
+  }
+  if (checkSet.size === 0) return null;
+  const candidates = [...checkSet];
 
-  const codeTouched = staged.some((file) => watchRes.some((re) => re.test(file)));
+  const codeTouched = candidates.some((file) => watchRes.some((re) => re.test(file)));
   if (!codeTouched) return null;
 
-  const docsTouched = staged.some((file) => docRes.some((re) => re.test(file)));
+  const docsTouched = candidates.some((file) => docRes.some((re) => re.test(file)));
   if (docsTouched) return null;
 
   const message = extractCommitMessage(command, repoRoot);
