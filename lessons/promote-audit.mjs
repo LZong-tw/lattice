@@ -92,7 +92,42 @@ function suggestEnforcement(lesson) {
   return "review for enforceability";
 }
 
+/**
+ * `gh issue create --label X` fails when label `X` doesn't already
+ * exist in the repo. Idempotently ensure it exists before any issue
+ * creation attempt. Cached per-process so we don't shell out on every
+ * call. `--force` makes the create idempotent (creates if missing,
+ * updates color/description otherwise).
+ */
+const ensuredLabels = new Set();
+function ensureLabel(label) {
+  if (ensuredLabels.has(label)) return;
+  try {
+    execFileSync(
+      "gh",
+      [
+        "label",
+        "create",
+        label,
+        "--color",
+        "fbca04",
+        "--description",
+        "Prose lesson promoted to audit/hook candidate",
+        "--force",
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] },
+    );
+  } catch (err) {
+    process.stderr.write(
+      `lattice/lessons: could not ensure label "${label}" — ${err.message}. ` +
+        `Issue creation may fail; create the label manually with \`gh label create ${label}\`.\n`,
+    );
+  }
+  ensuredLabels.add(label);
+}
+
 function openIssue({ title, body, label }) {
+  ensureLabel(label);
   // Body contains backticks and `$...` from lesson markdown. Passing
   // through shell would corrupt or fail; argv-form + temp file is the
   // only safe path.

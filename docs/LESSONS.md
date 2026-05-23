@@ -147,6 +147,19 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: pnpm i --frozen-lockfile
+
+      # `gh issue create --label` requires the label to already exist
+      # in the repo. `gh label create --force` is idempotent (creates
+      # if missing, updates color/description otherwise) so the first
+      # workflow run on a fresh repo doesn't fail with
+      # "could not add label: 'lessons-audit' not found".
+      - env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          gh label create lessons-audit \
+            --color "0e8a16" \
+            --description "Weekly lessons-doc reorganize/promote audit tracking" \
+            --force
+
       - run: node node_modules/@lzong.tw/lattice/lessons/reorganize-audit.mjs > /tmp/reorg.md
       - run: node node_modules/@lzong.tw/lattice/lessons/promote-audit.mjs > /tmp/promote.md
       - env:
@@ -244,6 +257,17 @@ gh issue create --title "..." --body-file /tmp/body.md
 recipe above mirrors it. Both are conservative on purpose — the cost of
 defensive argv is zero, the cost of a corrupted first cron run is a public
 issue with broken text.
+
+### A second first-run trap: missing labels
+
+`gh issue create --label X` **fails** if label `X` doesn't already exist
+in the repo. The error (`could not add label: 'X' not found`) only
+surfaces on the first workflow run, after which a human has to either
+create the label or strip `--label` from the script. `promote-audit.mjs`
+ships an idempotent `gh label create … --force` call (cached per
+process) before any issue-creation attempt, and the GitHub Actions
+recipe above does the same. Adopt this pattern in any script that
+references a label you might not have manually created yet.
 
 ## How the four layers compose
 
