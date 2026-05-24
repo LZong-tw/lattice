@@ -11,24 +11,32 @@ vi.mock("../serena/bootstrap.mjs", () => ({
   bootstrapSerena: vi.fn(),
 }));
 
+vi.mock("../serena/cleanup-processes.mjs", () => ({
+  cleanupSerenaProcesses: vi.fn(),
+}));
+
 // Importing the mocked modules pulls them through vitest's mock factory so we
 // can assert on the spies. Top-level imports of the provider above resolve
 // against the same mocked modules because the dynamic imports inside provider
 // methods go through the same module graph.
 const { validateRequiredSerenaMcpConfig } = await import("../serena/mcp-config-guard.mjs");
 const { bootstrapSerena } = await import("../serena/bootstrap.mjs");
+const { cleanupSerenaProcesses } = await import("../serena/cleanup-processes.mjs");
 
 const validateMock = validateRequiredSerenaMcpConfig as unknown as ReturnType<typeof vi.fn>;
 const bootstrapMock = bootstrapSerena as unknown as ReturnType<typeof vi.fn>;
+const cleanupMock = cleanupSerenaProcesses as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   validateMock.mockReset();
   bootstrapMock.mockReset();
+  cleanupMock.mockReset();
 });
 
 afterEach(() => {
   validateMock.mockReset();
   bootstrapMock.mockReset();
+  cleanupMock.mockReset();
 });
 
 describe("serenaProvider shape", () => {
@@ -140,6 +148,8 @@ describe("serenaProvider.handlers.SessionStart", () => {
     try {
       const result = await serenaProvider.handlers.SessionStart(ctx);
       expect(result).toEqual({});
+      expect(cleanupMock).toHaveBeenCalledOnce();
+      expect(cleanupMock).toHaveBeenCalledWith({ dryRun: false });
       expect(bootstrapMock).toHaveBeenCalledOnce();
       expect(bootstrapMock).toHaveBeenCalledWith("claude-code");
     } finally {
@@ -158,6 +168,7 @@ describe("serenaProvider.handlers.SessionStart", () => {
     try {
       const result = await serenaProvider.handlers.SessionStart(ctx);
       expect(result).toEqual({ exitCode: 2 });
+      expect(cleanupMock).toHaveBeenCalledOnce();
     } finally {
       dispose();
     }
@@ -174,6 +185,62 @@ describe("serenaProvider.handlers.SessionStart", () => {
     try {
       await serenaProvider.handlers.SessionStart(ctx);
       expect(bootstrapMock).toHaveBeenCalledWith("codex");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("skips stale-process cleanup when LATTICE_SERENA_CLEANUP is disabled", async () => {
+    bootstrapMock.mockReturnValue(0);
+
+    const { ctx, dispose } = mockContext({
+      client: "codex",
+      providerName: "serena",
+      event: "SessionStart",
+      env: { LATTICE_SERENA_CLEANUP: "0" },
+    });
+    try {
+      await serenaProvider.handlers.SessionStart(ctx);
+      expect(cleanupMock).not.toHaveBeenCalled();
+      expect(bootstrapMock).toHaveBeenCalledWith("codex");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("passes dry-run mode to stale-process cleanup", async () => {
+    bootstrapMock.mockReturnValue(0);
+
+    const { ctx, dispose } = mockContext({
+      client: "claude-code",
+      providerName: "serena",
+      event: "SessionStart",
+      env: { LATTICE_SERENA_CLEANUP_DRY_RUN: "1" },
+    });
+    try {
+      await serenaProvider.handlers.SessionStart(ctx);
+      expect(cleanupMock).toHaveBeenCalledWith({ dryRun: true });
+    } finally {
+      dispose();
+    }
+  });
+
+  it("continues bootstrapping when stale-process cleanup fails", async () => {
+    cleanupMock.mockImplementation(() => {
+      throw new Error("process list unavailable");
+    });
+    bootstrapMock.mockReturnValue(0);
+
+    const { ctx, stderr, dispose } = mockContext({
+      client: "claude-code",
+      providerName: "serena",
+      event: "SessionStart",
+    });
+    try {
+      const result = await serenaProvider.handlers.SessionStart(ctx);
+      expect(result).toEqual({});
+      expect(bootstrapMock).toHaveBeenCalledWith("claude-code");
+      expect(stderr.join("")).toContain("Serena stale-process cleanup skipped");
     } finally {
       dispose();
     }

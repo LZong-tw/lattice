@@ -322,6 +322,7 @@ START
 | File protection | `protection.mjs` | Edit guard for env files, `.git/`, and detected lockfiles. |
 | Verification profile | `verification/` | Stack-aware typecheck/lint detection and optional Stop gate. |
 | Serena provider | `serena/` | Serena-specific lifecycle, launcher, dashboard helpers, and v1 provider definition. |
+| Serena cleanup | `serena/cleanup-processes.mjs` | SessionStart stale-process cleanup for orphaned or idle Serena/WebView process trees. |
 | Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena stdio MCP. |
 | Semble provider | `semble/provider.mjs` | Semble v1 provider definition. |
 | Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP. |
@@ -345,6 +346,7 @@ Inside this repo, scripts live at the package root:
 - `verification/verify.mjs`
 - `mcp-config-common.mjs`
 - `serena/bootstrap.mjs`
+- `serena/cleanup-processes.mjs`
 - `serena/mcp-config-guard.mjs`
 - `semble/mcp-config-guard.mjs`
 - `rtk/provider.mjs`
@@ -859,7 +861,7 @@ Defaults (overridable via `LATTICE_TIMEOUT_<EVENT_IN_SCREAMING_SNAKE>=ms`):
 | `lattice/screenshot-reminder` | PreToolUse | (claude-code only) Remind to scroll all areas after a screenshot. |
 | `lattice/edit-reminder` | PostToolUse | Remind to log lessons after edits. |
 | `lattice/stop-checklist` | Stop | Print the end-of-turn checklist; optionally gate with verification (`LATTICE_VERIFY_ON_STOP=1`). |
-| `serena` | SessionStart, validator | Bootstrap [Serena](https://github.com/oraios/serena) MCP server; validate `.mcp.json` / `.codex/config.toml` when `LATTICE_REQUIRE_SERENA_MCP=1`. |
+| `serena` | SessionStart, validator | Clean up stale Serena/WebView process trees, bootstrap [Serena](https://github.com/oraios/serena) MCP server, and validate `.mcp.json` / `.codex/config.toml` when `LATTICE_REQUIRE_SERENA_MCP=1`. |
 | `semble` | validator only | Validate Semble MCP config when `LATTICE_REQUIRE_SEMBLE_MCP=1`. Skipped for Copilot. |
 | `rtk` | PreToolUse, validator | Optionally rewrite Claude/Codex Bash commands via `rtk rewrite`; validate the binary only when `LATTICE_REQUIRE_RTK=1`. Skipped for Copilot. |
 | `lattice/lessons` | Stop, PostToolUse, PreToolUse | Manage the growing-prose-rules problem in long-lived repos. Stop hook warns when `CLAUDE.md` exceeds a soft cap; PostToolUse Edit/Write resurfaces the per-domain doc when a touched file matches a configured domain; opt-in PreToolUse write-gate blocks `git commit` for code changes that don't also edit a docs path. Full guide: [`docs/LESSONS.md`](docs/LESSONS.md). Zero-config behaviour fires only the size-check warning. |

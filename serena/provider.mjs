@@ -47,6 +47,18 @@ export const serenaProvider = Object.freeze({
 
   handlers: Object.freeze({
     async SessionStart(ctx) {
+      if (ctx?.env?.LATTICE_SERENA_CLEANUP !== "0") {
+        try {
+          const { cleanupSerenaProcesses } = await import("./cleanup-processes.mjs");
+          cleanupSerenaProcesses({
+            dryRun: ctx?.env?.LATTICE_SERENA_CLEANUP_DRY_RUN === "1",
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          ctx?.log?.(`Serena stale-process cleanup skipped: ${message}`);
+        }
+      }
+
       const { bootstrapSerena } = await import("./bootstrap.mjs");
       const exitCode = bootstrapSerena(ctx.client);
       return exitCode === 0 ? {} : { exitCode };
