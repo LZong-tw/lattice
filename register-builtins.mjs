@@ -34,6 +34,7 @@ import {
 import { serenaProvider } from "./serena/provider.mjs";
 import { sembleProvider } from "./semble/provider.mjs";
 import { rtkProvider } from "./rtk/provider.mjs";
+import { lessonsProvider } from "./lessons/provider.mjs";
 
 registerProvider(protectionProvider);
 registerProvider(commitCheckpointProvider);
@@ -43,6 +44,7 @@ registerProvider(stopChecklistProvider);
 registerProvider(serenaProvider);
 registerProvider(sembleProvider);
 registerProvider(rtkProvider);
+registerProvider(lessonsProvider);
 
 const extra = (process.env.LATTICE_EXTRA_PROVIDERS ?? "")
   .split(",")

@@ -820,6 +820,8 @@ side-effect calls `registerProvider`.
 | `LATTICE_DISABLE=<n1>,<n2>` | Subtract these names from the active list. |
 | `LATTICE_PROVIDERS=none` (or `off` / `false` / `0`) | Disable all providers. |
 | `LATTICE_EXTRA_PROVIDERS=<spec1>,<spec2>` | Dynamically `import()` external provider modules at register-builtins load time. |
+| `LATTICE_LESSONS_CONFIG=<path>` | Absolute path to the `lattice/lessons` JSON config. Takes precedence over `.lattice/lessons.config.json` and `lattice.config.json#lessons`. |
+| `LATTICE_LESSONS_PROMOTE_THRESHOLD=<n>` | Override the default score threshold (`4`) used by `lessons/promote-audit.mjs` to mark a prose lesson as a candidate for promotion to an audit/hook. |
 
 For the **full** list of `LATTICE_*` env vars — including timeouts, Codex
 runner controls, built-in provider settings (`LATTICE_VERIFY_*`,
@@ -860,6 +862,7 @@ Defaults (overridable via `LATTICE_TIMEOUT_<EVENT_IN_SCREAMING_SNAKE>=ms`):
 | `serena` | SessionStart, validator | Bootstrap [Serena](https://github.com/oraios/serena) MCP server; validate `.mcp.json` / `.codex/config.toml` when `LATTICE_REQUIRE_SERENA_MCP=1`. |
 | `semble` | validator only | Validate Semble MCP config when `LATTICE_REQUIRE_SEMBLE_MCP=1`. Skipped for Copilot. |
 | `rtk` | PreToolUse, validator | Optionally rewrite Claude/Codex Bash commands via `rtk rewrite`; validate the binary only when `LATTICE_REQUIRE_RTK=1`. Skipped for Copilot. |
+| `lattice/lessons` | Stop, PostToolUse, PreToolUse | Manage the growing-prose-rules problem in long-lived repos. Stop hook warns when `CLAUDE.md` exceeds a soft cap; PostToolUse Edit/Write resurfaces the per-domain doc when a touched file matches a configured domain; opt-in PreToolUse write-gate blocks `git commit` for code changes that don't also edit a docs path. Full guide: [`docs/LESSONS.md`](docs/LESSONS.md). Zero-config behaviour fires only the size-check warning. |
 
 ### Writing your own provider
 
