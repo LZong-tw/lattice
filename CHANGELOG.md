@@ -5,6 +5,17 @@ All notable changes to `@lzong.tw/lattice` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-05-26
+
+### Fixed
+
+- Serena cleanup now detects stale trees whose apparent `codex.exe` or
+  `claude.exe` parent is still running but detached from its launcher chain,
+  preventing orphaned `uvx` / `uv` / `serena` / WebView process trees from
+  accumulating after the originating shell exits.
+- Serena cleanup remains fail-open during `SessionStart`: cleanup errors are
+  logged and do not block Serena bootstrap or LLM context recovery.
+
 ## [0.2.0] — 2026-05-23
 
 ### Added
@@ -115,4 +126,6 @@ First public release.
 See `reports/lattice-review-synthesis-2026-05-21.md` for the full review
 synthesis that drove this pass.
 
+[0.2.1]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.1
+[0.2.0]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.0
 [0.1.0]: https://github.com/lzong-tw/lattice/releases/tag/v0.1.0
