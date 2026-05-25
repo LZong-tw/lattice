@@ -104,6 +104,46 @@ describe("collectSerenaCleanupTargets", () => {
     expect(targets).toEqual([]);
   });
 
+  it("targets Serena trees whose active client parent is detached from its launcher", () => {
+    const targets = collectSerenaCleanupTargets(
+      [
+        { id: 10, parentId: 999_999, name: "sh", startTime: hoursAgo(2) },
+        { id: 11, parentId: 10, name: "node", startTime: hoursAgo(2) },
+        { id: 12, parentId: 11, name: "codex", startTime: hoursAgo(2) },
+        {
+          id: 13,
+          parentId: 12,
+          name: "uvx",
+          startTime: hoursAgo(1),
+          cpuDeltaSeconds: 0,
+          privateBytes: mb(40),
+          workingSet: mb(30),
+        },
+        { id: 14, parentId: 13, name: "uv", startTime: hoursAgo(1) },
+        {
+          id: 15,
+          parentId: 14,
+          name: "serena",
+          path: "C:\\tools\\serena.exe",
+          startTime: hoursAgo(1),
+          cpuDeltaSeconds: 0,
+          privateBytes: mb(20),
+          workingSet: mb(10),
+        },
+      ],
+      cleanupOptionsFromEnv({ SERENA_CLEANUP_CPU_SAMPLE_MS: "0" }),
+      42,
+    );
+
+    expect(targets).toEqual([
+      expect.objectContaining({
+        kind: "serena-tree",
+        pid: 13,
+        reason: "detached-parent-serena-tree",
+      }),
+    ]);
+  });
+
   it("targets old idle python trees that own WebView children", () => {
     const targets = collectSerenaCleanupTargets(
       [

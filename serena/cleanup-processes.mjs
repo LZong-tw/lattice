@@ -15,6 +15,16 @@ const DEFAULTS = Object.freeze({
 
 const SERENA_WRAPPER_NAMES = new Set(["serena", "uvx", "uv", "python", "python3"]);
 const ACTIVE_PARENT_NAMES = new Set(["claude", "codex", "windowsterminal", "pwsh", "powershell", "node"]);
+const EXPECTED_ROOT_PARENT_NAMES = new Set([
+  "wininit",
+  "services",
+  "svchost",
+  "sihost",
+  "explorer",
+  "windowsterminal",
+  "codex",
+  "claude",
+]);
 
 function numberEnv(env, name, fallback) {
   const raw = env[name];
@@ -242,6 +252,26 @@ function hasDescendant(childrenByParent, byId, pid, predicate) {
   return false;
 }
 
+function hasDetachedActiveParent(byId, root) {
+  const directParent = byId.get(root.parentId);
+  if (!directParent || !ACTIVE_PARENT_NAMES.has(processName(directParent))) return false;
+
+  const seen = new Set([root.id]);
+  let current = directParent;
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    if (current.parentId <= 4) return false;
+
+    const parent = byId.get(current.parentId);
+    if (!parent) {
+      return !EXPECTED_ROOT_PARENT_NAMES.has(processName(current));
+    }
+    current = parent;
+  }
+
+  return false;
+}
+
 function rootForSerena(byId, row) {
   let root = row;
   let parent = byId.get(row.parentId);
@@ -322,6 +352,7 @@ function treeMetrics(root, byId, childrenByParent, protectedPids, now) {
     cpuDeltaSeconds,
     handleCount: rows.reduce((sum, row) => sum + (row.handleCount || 0), 0),
     parentMissing: root.parentId > 4 && !parent,
+    activeParentDetached: hasDetachedActiveParent(byId, root),
     parentName: parent ? processName(parent) : "",
     privateMB,
     threadCount: rows.reduce((sum, row) => sum + (row.threadCount || 0), 0),
@@ -364,8 +395,13 @@ export function idleLeakScore(kind, metrics, options = cleanupOptionsFromEnv()) 
     signals.push("age>=4h");
   }
   if (ACTIVE_PARENT_NAMES.has(metrics.parentName)) {
-    score -= 20;
-    signals.push(`active-parent=${metrics.parentName}`);
+    if (metrics.activeParentDetached) {
+      score += 60;
+      signals.push(`detached-active-parent=${metrics.parentName}`);
+    } else {
+      score -= 20;
+      signals.push(`active-parent=${metrics.parentName}`);
+    }
   }
   if (metrics.privateMB < 256) {
     score -= 30;
@@ -409,7 +445,9 @@ export function collectSerenaCleanupTargets(rows, options = cleanupOptionsFromEn
 
     const metrics = treeMetrics(root, byId, childrenByParent, protectedPids, now);
     if (metrics.parentMissing) addTarget(targets, root, "serena-tree", metrics, "orphan-serena-tree");
-    else {
+    else if (metrics.activeParentDetached && metrics.ageHours >= options.idleGraceHours) {
+      addTarget(targets, root, "serena-tree", metrics, "detached-parent-serena-tree");
+    } else {
       const decision = idleLeakScore("serena-tree", metrics, options);
       if (decision.kill) addTarget(targets, root, "serena-tree", metrics, decision.reason);
     }
@@ -425,7 +463,9 @@ export function collectSerenaCleanupTargets(rows, options = cleanupOptionsFromEn
 
     const metrics = treeMetrics(root, byId, childrenByParent, protectedPids, now);
     if (metrics.parentMissing) addTarget(targets, root, "serena-python-tree", metrics, "orphan-serena-python-tree");
-    else {
+    else if (metrics.activeParentDetached && metrics.ageHours >= options.idleGraceHours) {
+      addTarget(targets, root, "serena-python-tree", metrics, "detached-parent-serena-python-tree");
+    } else {
       const decision = idleLeakScore("serena-python-tree", metrics, options);
       if (decision.kill) addTarget(targets, root, "serena-python-tree", metrics, decision.reason);
     }

@@ -94,9 +94,10 @@ The process is **detached** and writes state files to the runtime directory.
 ### Stale Process Cleanup
 
 The cleanup step is heuristic, not a fixed-age kill switch. It scores each
-Serena-like process tree using parent liveness, CPU delta, private memory,
-working-set ratio, age, and WebView shape. Active trees are suppressed even when
-old; orphaned trees are removed immediately after the short grace window.
+Serena-like process tree using parent/ancestor liveness, CPU delta, private
+memory, working-set ratio, age, and WebView shape. Active trees are suppressed
+even when old; orphaned trees and trees whose client parent is detached from its
+launcher are removed after the short grace window.
 
 Useful switches:
 
