@@ -51,6 +51,7 @@ Python 3.10+ must be available as `python3` on PATH. On macOS:
 | Package file | Consumer path | Purpose |
 |--------------|---------------|---------|
 | `serena/bootstrap.mjs` | `hooks/serena/bootstrap.mjs` | Called by `session-start.mjs`; starts the Serena MCP server |
+| `serena/cleanup-processes.mjs` | `hooks/serena/cleanup-processes.mjs` | Runs before bootstrap to stop stale orphaned Serena/WebView process trees |
 | `serena/start-http.mjs` | `hooks/serena/start-http.mjs` | Shared Serena HTTP starter invoked by per-client launchers |
 | `serena/start-http-ide.sh` | `hooks/serena/start-http-ide.sh` | Copilot CLI launcher (port 9121) |
 | `serena/start-http-claude-code.sh` | `hooks/serena/start-http-claude-code.sh` | Claude Code launcher (port 9122) |
@@ -72,7 +73,9 @@ Python 3.10+ must be available as `python3` on PATH. On macOS:
 
 ## MCP Server Lifecycle
 
-`session-start.mjs` delegates to `serena/bootstrap.mjs`, which starts Serena in
+`session-start.mjs` delegates to the Serena provider. By default, the provider
+first runs `serena/cleanup-processes.mjs` to stop stale orphaned Serena/WebView
+process trees, then calls `serena/bootstrap.mjs`, which starts Serena in
 streamable HTTP mode through per-client launcher scripts. This is separate from
 the stdio MCP tool config below. The shared starter runs:
 
@@ -87,6 +90,34 @@ Launchers are **idempotent**: if Serena is already listening on the target port,
 the launcher exits 0 without starting a second instance.
 
 The process is **detached** and writes state files to the runtime directory.
+
+### Stale Process Cleanup
+
+The cleanup step is heuristic, not a fixed-age kill switch. It scores each
+Serena-like process tree using parent liveness, CPU delta, private memory,
+working-set ratio, age, and WebView shape. Active trees are suppressed even when
+old; orphaned trees are removed immediately after the short grace window.
+
+Useful switches:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LATTICE_SERENA_CLEANUP=0` | enabled | Disable cleanup before Serena bootstrap. |
+| `LATTICE_SERENA_CLEANUP_DRY_RUN=1` | off | Log what cleanup would stop without killing anything. |
+| `SERENA_CLEANUP_CPU_SAMPLE_MS` | `1200` | CPU sampling window; set `0` for no second sample. |
+| `SERENA_CLEANUP_IDLE_GRACE_HOURS` | `0.25` | Minimum age before idle leak scoring can stop a tree. |
+| `SERENA_CLEANUP_ORPHAN_WEBVIEW_GRACE_HOURS` | `0.25` | Minimum age before orphan WebView-only trees are stopped. |
+| `SERENA_CLEANUP_HIGH_PRIVATE_MB` | `768` | Private-memory signal threshold. |
+| `SERENA_CLEANUP_LOW_WORKING_SET_MB` | `128` | Low working-set signal threshold. |
+| `SERENA_CLEANUP_LOW_WORKING_SET_RATIO` | `0.12` | Low working-set/private-memory ratio signal. |
+| `SERENA_CLEANUP_IDLE_CPU_SECONDS` | `0.2` | CPU delta considered idle during the sample window. |
+| `SERENA_CLEANUP_KILL_SCORE` | `70` | Score required for an old idle tree to be stopped. |
+
+Manual dry-run:
+
+```bash
+node hooks/serena/cleanup-processes.mjs --dry-run
+```
 
 ---
 

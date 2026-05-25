@@ -72,6 +72,7 @@ const entryPoints = [
   "serena/dashboard-state.mjs",
   "serena/mcp-config-guard.mjs",
   "serena/start-http.mjs",
+  "serena/cleanup-processes.mjs",
   "serena/open-dashboard.mjs",
   "serena/provider.mjs",
   "semble/mcp-config-guard.mjs",
