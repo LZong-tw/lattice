@@ -172,7 +172,7 @@ Only enable required providers. The hook layer works without them.
 
 | Provider | When to enable | Required setup |
 |----------|----------------|----------------|
-| Serena | You want startup-time Serena MCP lifecycle and dashboard checks | Follow [docs/SERENA-CLIENT-SETUP.md](docs/SERENA-CLIENT-SETUP.md), then set `LATTICE_REQUIRE_SERENA_MCP=1` only after MCP config exists. |
+| Serena | You want startup-time Serena MCP lifecycle and dashboard checks | Follow [docs/SERENA-CLIENT-SETUP.md](docs/SERENA-CLIENT-SETUP.md), then set `LATTICE_REQUIRE_SERENA_MCP=1` only after a stable loopback HTTP singleton exists. Legacy stdio configs still validate during migration. |
 | Semble | You want code-search MCP available at startup | Add a stdio `semble` MCP entry to Claude/Codex config, then set `LATTICE_REQUIRE_SEMBLE_MCP=1` only after config exists. |
 | RTK | You want Bash command output rewritten through `rtk rewrite` | Install `rtk` and `rg`; run `rtk init -g --show` to inspect native hook status; leave fail-open by default, or set `LATTICE_REQUIRE_RTK=1` only when missing RTK should block startup. |
 
@@ -343,7 +343,7 @@ START
 | Verification profile | `verification/` | Stack-aware typecheck/lint detection and optional Stop gate. |
 | Serena provider | `serena/` | Serena-specific lifecycle, launcher, dashboard helpers, and v1 provider definition. |
 | Serena cleanup | `serena/cleanup-processes.mjs` | SessionStart stale-process cleanup for orphaned or idle Serena/WebView process trees. |
-| Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena stdio MCP. |
+| Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena MCP through a stable loopback HTTP singleton. Legacy stdio configs still validate during migration. |
 | Semble provider | `semble/provider.mjs` | Semble v1 provider definition. |
 | Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP. |
 | RTK provider | `rtk/provider.mjs` | Optional PreToolUse command rewrite through `rtk rewrite` for token-compacted shell output. |
@@ -929,7 +929,7 @@ Defaults (overridable via `LATTICE_TIMEOUT_<EVENT_IN_SCREAMING_SNAKE>=ms`):
 | `lattice/screenshot-reminder` | PreToolUse | (claude-code only) Remind to scroll all areas after a screenshot. |
 | `lattice/edit-reminder` | PostToolUse | Remind to log lessons after edits. |
 | `lattice/stop-checklist` | Stop | Print the end-of-turn checklist; optionally gate with verification (`LATTICE_VERIFY_ON_STOP=1`). |
-| `serena` | SessionStart, validator | Clean up stale Serena/WebView process trees, bootstrap [Serena](https://github.com/oraios/serena) MCP server, and validate `.mcp.json` / `.codex/config.toml` when `LATTICE_REQUIRE_SERENA_MCP=1`. |
+| `serena` | SessionStart, validator | Clean up stale Serena/WebView process trees, bootstrap [Serena](https://github.com/oraios/serena) MCP server, and validate `.mcp.json` / `.codex/config.toml` stable loopback HTTP config when `LATTICE_REQUIRE_SERENA_MCP=1`. Legacy stdio configs still validate during migration. |
 | `semble` | validator only | Validate Semble MCP config when `LATTICE_REQUIRE_SEMBLE_MCP=1`. Skipped for Copilot. |
 | `rtk` | PreToolUse, validator | Optionally rewrite Claude/Codex Bash commands via `rtk rewrite`; validate the binary only when `LATTICE_REQUIRE_RTK=1`. Skipped for Copilot. |
 | `lattice/lessons` | Stop, PostToolUse, PreToolUse | Manage the growing-prose-rules problem in long-lived repos. Stop hook warns when `CLAUDE.md` exceeds a soft cap; PostToolUse Edit/Write resurfaces the per-domain doc when a touched file matches a configured domain; opt-in PreToolUse write-gate blocks `git commit` for code changes that don't also edit a docs path. Full guide: [`docs/LESSONS.md`](docs/LESSONS.md). Zero-config behaviour fires only the size-check warning. |

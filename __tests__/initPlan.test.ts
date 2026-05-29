@@ -74,7 +74,7 @@ describe("lattice init install plan", () => {
     expect(state.codex.usesDeprecatedHooksFlag).toBe(true);
     expect(plan.warnings).toContain("Codex config uses deprecated [features].codex_hooks; replace it with [features].hooks.");
     expect(plan.phases.flatMap((phase) => phase.actions)).toContain(
-      "Add Serena MCP config for each selected client before setting LATTICE_REQUIRE_SERENA_MCP=1.",
+      "Add a stable loopback HTTP Serena MCP singleton for each selected client before setting LATTICE_REQUIRE_SERENA_MCP=1 (legacy stdio configs still validate during migration).",
     );
     expect(plan.phases.flatMap((phase) => phase.actions)).toContain(
       "Add stdio Semble MCP config before setting LATTICE_REQUIRE_SEMBLE_MCP=1.",

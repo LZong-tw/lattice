@@ -350,7 +350,7 @@ function providerPhase(options) {
   };
 
   if (options.providers.includes("serena")) {
-    phase.actions.push("Add Serena MCP config for each selected client before setting LATTICE_REQUIRE_SERENA_MCP=1.");
+    phase.actions.push("Add a stable loopback HTTP Serena MCP singleton for each selected client before setting LATTICE_REQUIRE_SERENA_MCP=1 (legacy stdio configs still validate during migration).");
     phase.commands.push("uvx --version");
     phase.commands.push("curl -sf http://127.0.0.1:<serena-port>/mcp");
   }

@@ -612,7 +612,7 @@ describe("Serena MCP startup guard", () => {
     ];
   }
 
-  it("accepts Claude stdio Serena config with the project preselected", () => {
+  it("keeps accepting legacy Claude stdio Serena config with the project preselected", () => {
     const root = createTempRoot();
     writeFileSync(
       join(root, ".mcp.json"),
@@ -670,7 +670,7 @@ describe("Serena MCP startup guard", () => {
     });
   });
 
-  it("rejects Claude HTTP Serena config because tools may attach too late", () => {
+  it("accepts Claude HTTP Serena config for a project-wide singleton", () => {
     const root = createTempRoot();
     writeFileSync(
       join(root, ".mcp.json"),
@@ -685,12 +685,13 @@ describe("Serena MCP startup guard", () => {
       "utf8",
     );
 
-    const result = validateRequiredSerenaMcpConfig("claude", { root });
-    expect(result.ok).toBe(false);
-    expect(result.failures.join("\n")).toContain("must use stdio command/args");
+    expect(validateRequiredSerenaMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
   });
 
-  it("accepts Codex stdio Serena config with the project preselected", () => {
+  it("keeps accepting legacy Codex stdio Serena config with the project preselected", () => {
     const root = createTempRoot();
     writeFileSync(
       join(root, ".codex", "config.toml"),
@@ -698,6 +699,24 @@ describe("Serena MCP startup guard", () => {
         "[mcp_servers.serena]",
         'command = "uvx"',
         `args = ${JSON.stringify(serenaArgs("codex", root))}`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(validateRequiredSerenaMcpConfig("codex", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+  });
+
+  it("accepts Codex HTTP Serena config for a project-wide singleton", () => {
+    const root = createTempRoot();
+    writeFileSync(
+      join(root, ".codex", "config.toml"),
+      [
+        "[mcp_servers.serena]",
+        'url = "http://127.0.0.1:9127/mcp"',
         "",
       ].join("\n"),
       "utf8",

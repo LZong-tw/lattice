@@ -92,7 +92,42 @@ function validateProjectWrapperEntry(args, expectedContext, root, label) {
   return failures;
 }
 
-function validateSerenaStdioEntry(entry, expectedContext, root, label) {
+function isLoopbackHost(hostname) {
+  return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
+}
+
+function validateSerenaHttpEntry(entry, label) {
+  const failures = [];
+
+  if (entry.type && entry.type !== "http") {
+    failures.push(`${label} HTTP entry type must be "http" when type is set.`);
+  }
+
+  if (typeof entry.url !== "string" || entry.url.trim() === "") {
+    failures.push(`${label} must define url for the Serena HTTP singleton.`);
+    return failures;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(entry.url);
+  } catch {
+    failures.push(`${label} url must be a valid URL.`);
+    return failures;
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol) || !isLoopbackHost(parsed.hostname)) {
+    failures.push(`${label} must point at a loopback HTTP endpoint.`);
+  }
+
+  if (!parsed.pathname.endsWith("/mcp")) {
+    failures.push(`${label} url must point at a /mcp endpoint.`);
+  }
+
+  return failures;
+}
+
+function validateSerenaMcpEntry(entry, expectedContext, root, label) {
   const failures = [];
 
   if (!entry || typeof entry !== "object") {
@@ -100,7 +135,7 @@ function validateSerenaStdioEntry(entry, expectedContext, root, label) {
   }
 
   if (hasOwn(entry, "url")) {
-    failures.push(`${label} must use stdio command/args, not url.`);
+    return validateSerenaHttpEntry(entry, label);
   }
 
   const args = Array.isArray(entry.args) ? entry.args : [];
@@ -128,7 +163,7 @@ function validateClaude(root) {
     return [`Failed to read ${filePath}: ${parsed.error}`];
   }
 
-  return validateSerenaStdioEntry(
+  return validateSerenaMcpEntry(
     parsed.mcpServers?.serena,
     EXPECTED_CONTEXT_BY_CLIENT.claude,
     root,
@@ -143,7 +178,7 @@ function validateCodex(root) {
     return [`Failed to read ${filePath}: ${parsed.error}`];
   }
 
-  return validateSerenaStdioEntry(
+  return validateSerenaMcpEntry(
     parsed.entry,
     EXPECTED_CONTEXT_BY_CLIENT.codex,
     root,

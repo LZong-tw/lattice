@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Git Bash, and suppresses noisy Codex companion lifecycle warnings without
   editing upstream plugin source.
 - Documented when to run the repair after Codex plugin installs or updates.
+- `LATTICE_REQUIRE_SERENA_MCP=1` now validates loopback HTTP singleton Serena
+  MCP URLs for project-wide setups where Claude Code and Codex share one stable
+  endpoint. Legacy stdio config remains accepted during migration.
 
 ## [0.2.6] — 2026-05-29
 

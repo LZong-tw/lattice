@@ -419,7 +419,7 @@ node hooks/codex-hook-runner.mjs pre-tool-policy.mjs codex
 | `LATTICE_VERIFY_ON_STOP` | `lattice/stop-checklist` | Enable the Stop-time verification gate (typecheck/lint). Off by default. |
 | `LATTICE_VERIFY_VERBOSE` | `lattice/stop-checklist` | Verbose stderr output during verification. |
 | `LATTICE_VERIFY_MAX_STRIKES` | `lattice/stop-checklist` | Override the circuit-breaker threshold for repeated verification failures. |
-| `LATTICE_REQUIRE_SERENA_MCP` | `serena` | When set, SessionStart validator fails if `.mcp.json` / `.codex/config.toml` does not declare the Serena stdio MCP entry. |
+| `LATTICE_REQUIRE_SERENA_MCP` | `serena` | When set, SessionStart validator fails if `.mcp.json` / `.codex/config.toml` does not declare a stable loopback HTTP Serena singleton URL. Legacy stdio entries still validate during migration. |
 | `LATTICE_REQUIRE_SEMBLE_MCP` | `semble` | When set, SessionStart validator fails if the Semble stdio MCP entry is missing. Ignored on `copilot-cli`. |
 
 ### Naming-convention carve-out

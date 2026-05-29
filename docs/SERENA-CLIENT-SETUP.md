@@ -9,11 +9,14 @@ Serena MCP tools plus dashboard lifecycle support.
 
 Important contract:
 
-- AI-client MCP tool attachment must use **stdio** `command` / `args`.
-- The managed HTTP server is only for lifecycle and dashboard support.
-- Do not configure Serena tools with `url = "http://127.0.0.1:.../mcp"` when
-  `LATTICE_REQUIRE_SERENA_MCP=1`; the guard rejects HTTP config because tools
-  may attach too late during startup.
+- New AI-client MCP tool attachment should use a stable **loopback HTTP**
+  `url = "http://127.0.0.1:<port>/mcp"` singleton.
+- The URL exposed to Claude Code/Codex must be stable. If a singleton needs an
+  internal dynamic port, front it with a fixed loopback proxy; do not silently
+  move the advertised MCP URL after client startup.
+- `LATTICE_REQUIRE_SERENA_MCP=1` validates loopback HTTP singleton URLs and
+  rejects non-loopback HTTP endpoints. Legacy stdio entries are still accepted
+  for older consumers during migration, but they are not the recommended setup.
 
 ---
 
@@ -77,7 +80,7 @@ Python 3.10+ must be available as `python3` on PATH. On macOS:
 first runs `serena/cleanup-processes.mjs` to stop stale orphaned Serena/WebView
 process trees, then calls `serena/bootstrap.mjs`, which starts Serena in
 streamable HTTP mode through per-client launcher scripts. This is separate from
-the stdio MCP tool config below. The shared starter runs:
+the AI-client MCP tool attachment. The shared starter runs:
 
 ```bash
 uvx --from git+https://github.com/oraios/serena serena start-mcp-server \
@@ -141,33 +144,27 @@ The base hooks config in `.claude/settings.json` (see [README](../README.md#clau
 already calls `session-start.mjs claude-code`, which triggers Serena bootstrap
 automatically.
 
-**Additional MCP config surface** — add Serena as a stdio MCP server so Claude
-Code can call Serena tools at startup. The repo-scoped Claude MCP file is
-`.mcp.json`:
+**Additional MCP config surface** — point Claude Code at a project-wide
+loopback HTTP singleton:
 
 ```jsonc
-// .mcp.json
+// global ~/.claude.json or the Claude MCP surface your environment uses
 {
   "mcpServers": {
     "serena": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena",
-        "start-mcp-server",
-        "--context",
-        "claude-code",
-        "--project-from-cwd"
-      ]
+      "type": "http",
+      "url": "http://127.0.0.1:9127/mcp"
     }
   }
 }
 ```
 
-If Claude Code does not launch the MCP command from the repo root, replace
-`--project-from-cwd` with `--project /absolute/path/to/consumer-repo`.
+Keep that URL stable across restarts. If port `9127` is occupied by an
+unrelated process, fail and repair the config/startup pair instead of choosing a
+new hidden port.
+
+Legacy stdio MCP entries remain validator-compatible for older consumers, but
+new setups should prefer the stable HTTP singleton shape above.
 
 **Smoke test:**
 
@@ -222,21 +219,19 @@ curl -sf http://127.0.0.1:9121/mcp -o /dev/null && echo "OK" || echo "FAIL"
 The base hooks config in `.codex/hooks.json` (see [README](../README.md#codex-cli-config))
 already calls `session-start.mjs codex`, which triggers Serena bootstrap.
 
-**Additional MCP config surface** — add Serena as a stdio MCP server to Codex's
-repo-scoped `.codex/config.toml`:
+**Additional MCP config surface** — point Codex at a project-wide loopback HTTP
+singleton in `.codex/config.toml`:
 
 ```toml
-# .codex/config.toml
-[features]
-hooks = true
-
 [mcp_servers.serena]
-command = "uvx"
-args = ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "codex", "--project-from-cwd"]
+url = "http://127.0.0.1:9127/mcp"
 ```
 
-If Codex does not launch the MCP command from the repo root, replace
-`--project-from-cwd` with `--project /absolute/path/to/consumer-repo`.
+Keep the configured port stable. The MCP client reads this URL as configuration;
+hooks cannot move an already-started client to a new port.
+
+Legacy stdio MCP entries remain validator-compatible for older consumers, but
+new setups should prefer the stable HTTP singleton shape above.
 
 **Smoke test:**
 

@@ -39,7 +39,41 @@ function writeClaudeConfig(root: string, args: string[]) {
   );
 }
 
+function writeClaudeHttpConfig(root: string, url = "http://127.0.0.1:9127/mcp") {
+  writeFileSync(
+    join(root, ".mcp.json"),
+    JSON.stringify({
+      mcpServers: {
+        serena: {
+          type: "http",
+          url,
+        },
+      },
+    }),
+    "utf8",
+  );
+}
+
 describe("Serena MCP config guard — upstream pinning (H4)", () => {
+  it("accepts a loopback HTTP singleton", () => {
+    const root = createTempRoot();
+    writeClaudeHttpConfig(root);
+
+    expect(validateRequiredSerenaMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+  });
+
+  it("rejects non-loopback HTTP Serena endpoints", () => {
+    const root = createTempRoot();
+    writeClaudeHttpConfig(root, "https://example.com/mcp");
+
+    const result = validateRequiredSerenaMcpConfig("claude", { root });
+    expect(result.ok).toBe(false);
+    expect(result.failures.join("\n")).toContain("must point at a loopback HTTP endpoint");
+  });
+
   it("accepts the bare upstream URL (current behavior)", () => {
     const root = createTempRoot();
     writeClaudeConfig(
