@@ -166,13 +166,17 @@ rtk init -g --show
 If RTK reports that no hook is installed, choose one rewrite layer:
 
 - **Native RTK hook mode:** run the `rtk init -g ...` command suggested by RTK
-  for the installed clients. In Lattice-managed repos, leave `--providers rtk`
-  off or set `LATTICE_RTK_DISABLED=1` so the same Bash command is not rewritten
-  twice.
+  for the installed clients. Native RTK wins: the Lattice provider skips
+  commands that already start with `rtk ...`, and on Claude Code it also skips
+  when the global `rtk hook claude` PreToolUse hook is detected.
 - **Lattice RTK provider mode:** keep RTK native hooks unpatched and enable the
   Lattice `rtk` provider per repo. Some RTK versions may still print a global
   "No hook installed" reminder; that is RTK's native-hook status, not proof that
   Lattice failed to call `rtk rewrite`.
+
+If you intentionally need the Lattice provider to run even when a native RTK
+hook is detected, set `LATTICE_RTK_FORCE_PROVIDER=1`. If you need to suppress
+the provider completely, set `LATTICE_RTK_DISABLED=1`.
 
 Default behavior is fail-open:
 
@@ -181,6 +185,8 @@ Default behavior is fail-open:
   source of truth.
 - `RTK_DISABLED=1 <command>` skips one command.
 - `LATTICE_RTK_DISABLED=1` skips the provider for the whole hook environment.
+- `LATTICE_RTK_FORCE_PROVIDER=1` overrides native-hook detection and keeps the
+  Lattice provider active.
 - `LATTICE_REQUIRE_RTK=1` makes startup fail if `rtk --version` does not pass.
 
 Useful environment knobs:

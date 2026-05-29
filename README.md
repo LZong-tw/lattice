@@ -724,9 +724,11 @@ RTK also expects `rg`/ripgrep for many rewrites. Install it once per machine
 `brew install ripgrep` on macOS, or your Linux package manager), then restart
 already-open terminals so AI-client hooks see the updated PATH.
 
-Run `rtk init -g --show` to check RTK's native global hook status. If you enable
-RTK's native hooks, do not also enable the Lattice `rtk` provider in the same
-repo unless you intentionally want two rewrite layers.
+Run `rtk init -g --show` to check RTK's native global hook status. Native RTK
+wins: the Lattice `rtk` provider skips commands that already start with
+`rtk ...`, and on Claude Code it also skips when the global `rtk hook claude`
+PreToolUse hook is detected. Set `LATTICE_RTK_FORCE_PROVIDER=1` only when you
+explicitly want the Lattice provider to run anyway.
 
 Default behavior is fail-open:
 
@@ -734,6 +736,8 @@ Default behavior is fail-open:
 - `git commit` commands are never rewritten so the Lattice commit gate remains the
   source of truth.
 - `RTK_DISABLED=1 <command>` and `LATTICE_RTK_DISABLED=1` skip the provider.
+- `LATTICE_RTK_FORCE_PROVIDER=1` forces the provider to run even when native RTK
+  hook mode is detected.
 - Set `LATTICE_REQUIRE_RTK=1` during `SessionStart` only when the repo wants
   startup to fail if `rtk` is unavailable.
 

@@ -8,6 +8,8 @@
  */
 
 import { execFile } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { CLIENTS } from "../client-enum.mjs";
 import {
@@ -40,6 +42,61 @@ function isRtkDisabled(command, env) {
     env.RTK_DISABLED === "1" ||
     /(^|\s)RTK_DISABLED=1(\s|$)/.test(command)
   );
+}
+
+function isRtkCommand(command) {
+  return /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*rtk(?:\.exe|\.cmd)?(?:\s|$)/i.test(command);
+}
+
+function getHomeDir(env) {
+  return env.USERPROFILE || env.HOME || "";
+}
+
+function containsClaudeRtkHook(value) {
+  if (typeof value === "string") {
+    return /\brtk(?:\.exe|\.cmd)?\s+hook\s+claude\b/i.test(value);
+  }
+  if (Array.isArray(value)) {
+    return value.some(containsClaudeRtkHook);
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value).some(containsClaudeRtkHook);
+  }
+  return false;
+}
+
+function hasClaudeNativeRtkHook(env) {
+  const home = getHomeDir(env);
+  if (!home) return false;
+
+  const settingsPath = join(home, ".claude", "settings.json");
+  if (!existsSync(settingsPath)) return false;
+
+  try {
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    return containsClaudeRtkHook(settings?.hooks?.PreToolUse);
+  } catch {
+    return false;
+  }
+}
+
+function shouldPreferNativeRtk(command, ctx) {
+  if (ctx.env.LATTICE_RTK_FORCE_PROVIDER === "1") {
+    return false;
+  }
+  if (ctx.env.LATTICE_RTK_NATIVE_HOOK === "1") {
+    return true;
+  }
+  if (ctx.env.LATTICE_RTK_NATIVE_HOOK === "0") {
+    return false;
+  }
+  if (isRtkCommand(command)) {
+    return true;
+  }
+  if (ctx.client === CLIENTS.CLAUDE_CODE) {
+    return hasClaudeNativeRtkHook(ctx.env);
+  }
+  return false;
 }
 
 function runRtk(bin, args, ctx, timeoutMs) {
@@ -137,7 +194,11 @@ export const rtkProvider = Object.freeze({
         return {};
       }
 
-      if (isGitCommitCommand(command) || isRtkDisabled(command, ctx.env)) {
+      if (
+        isGitCommitCommand(command) ||
+        isRtkDisabled(command, ctx.env) ||
+        shouldPreferNativeRtk(command, ctx)
+      ) {
         return {};
       }
 
@@ -155,4 +216,3 @@ export const rtkProvider = Object.freeze({
     },
   }),
 });
-

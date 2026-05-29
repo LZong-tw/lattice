@@ -197,4 +197,82 @@ describe("rtkProvider.PreToolUse", () => {
 
     expect(result).toEqual({});
   });
+
+  it("does not rewrite commands already prefixed by native RTK", async () => {
+    const { result } = await runProvider(
+      rtkProvider,
+      "PreToolUse",
+      mockPayload.preToolUse({
+        tool_name: "Bash",
+        tool_input: { command: "rtk git status" },
+      }),
+      { contextOverrides: { env: { LATTICE_RTK_BIN: "/missing/rtk" } } },
+    );
+
+    expect(result).toEqual({});
+  });
+
+  it("lets explicit native RTK hook mode take priority", async () => {
+    const { result, stderr } = await runProvider(
+      rtkProvider,
+      "PreToolUse",
+      mockPayload.preToolUse({
+        tool_name: "Bash",
+        tool_input: { command: "git status" },
+      }),
+      {
+        contextOverrides: {
+          env: {
+            LATTICE_RTK_BIN: "/missing/rtk",
+            LATTICE_RTK_DEBUG: "1",
+            LATTICE_RTK_NATIVE_HOOK: "1",
+          },
+        },
+      },
+    );
+
+    expect(result).toEqual({});
+    expect(stderr).toEqual([]);
+  });
+
+  it("detects Claude's native RTK hook and does not run the provider rewrite", async () => {
+    const home = path.join(tempDir, "home");
+    fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        hooks: {
+          PreToolUse: [
+            {
+              matcher: "Bash",
+              hooks: [{ type: "command", command: "rtk hook claude" }],
+            },
+          ],
+        },
+      }),
+      "utf8",
+    );
+
+    const { result, stderr } = await runProvider(
+      rtkProvider,
+      "PreToolUse",
+      mockPayload.preToolUse({
+        tool_name: "Bash",
+        tool_input: { command: "git status" },
+      }),
+      {
+        contextOverrides: {
+          env: {
+            HOME: home,
+            USERPROFILE: home,
+            LATTICE_RTK_BIN: "/missing/rtk",
+            LATTICE_RTK_DEBUG: "1",
+          },
+        },
+      },
+    );
+
+    expect(result).toEqual({});
+    expect(stderr).toEqual([]);
+  });
 });
