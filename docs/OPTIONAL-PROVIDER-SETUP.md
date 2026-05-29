@@ -178,6 +178,31 @@ If you intentionally need the Lattice provider to run even when a native RTK
 hook is detected, set `LATTICE_RTK_FORCE_PROVIDER=1`. If you need to suppress
 the provider completely, set `LATTICE_RTK_DISABLED=1`.
 
+### OpenCode
+
+OpenCode is handled by RTK's native OpenCode plugin, not by the Lattice `rtk`
+provider. Lattice currently wires Claude Code, Codex CLI, and GitHub Copilot
+CLI as hook clients; OpenCode command rewrite should be installed globally:
+
+```bash
+rtk init -g --opencode
+rtk init -g --show
+# => [ok] OpenCode: plugin installed (.../opencode/plugins/rtk.ts)
+```
+
+The plugin lives at:
+
+- Windows: `%USERPROFILE%\.config\opencode\plugins\rtk.ts`
+- macOS/Linux: `~/.config/opencode/plugins/rtk.ts`
+
+Restart OpenCode after installing the plugin. Test with a normal shell command
+such as `git status`, then run `rtk gain --history` to confirm OpenCode command
+usage appears in RTK's history.
+
+Do not also force the Lattice `rtk` provider for OpenCode. If OpenCode support
+is added to Lattice in the future, keep the same rule as Claude Code: native RTK
+plugin first, Lattice provider only as a fallback.
+
 Default behavior is fail-open:
 
 - If `rtk` is missing, times out, or returns no rewrite, the original command runs.

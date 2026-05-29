@@ -13,7 +13,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -61,6 +61,18 @@ function optionalCli(label, command, args = ["--version"], options = {}) {
 
   info(`${label} not found or not runnable${options.detail ? ` — ${options.detail}` : ""} (non-blocking)`);
   return false;
+}
+
+function userHome() {
+  return process.env.USERPROFILE || process.env.HOME || "";
+}
+
+function optionalFile(label, filePath, detail) {
+  if (filePath && existsSync(filePath)) {
+    pass(`${label} available — ${filePath}`);
+  } else {
+    info(`${label} not found${detail ? ` — ${detail}` : ""} (non-blocking)`);
+  }
 }
 
 // --- Node.js version ---
@@ -191,8 +203,14 @@ optionalCli("Codex CLI", "codex", ["--version"]);
 optionalCli("GitHub Copilot CLI", "gh", ["copilot", "--help"], {
   detail: "requires gh plus the copilot extension",
 });
+optionalCli("OpenCode CLI", "opencode", ["--version"]);
 optionalCli("RTK CLI", "rtk", ["--version"]);
 optionalCli("ripgrep", "rg", ["--version"]);
+optionalFile(
+  "RTK OpenCode plugin",
+  join(userHome(), ".config", "opencode", "plugins", "rtk.ts"),
+  "install with `rtk init -g --opencode`",
+);
 
 // --- Summary ---
 console.log("");

@@ -730,6 +730,19 @@ wins: the Lattice `rtk` provider skips commands that already start with
 PreToolUse hook is detected. Set `LATTICE_RTK_FORCE_PROVIDER=1` only when you
 explicitly want the Lattice provider to run anyway.
 
+For OpenCode, use RTK's native OpenCode plugin instead of the Lattice `rtk`
+provider:
+
+```bash
+rtk init -g --opencode
+rtk init -g --show
+# => [ok] OpenCode: plugin installed (.../opencode/plugins/rtk.ts)
+```
+
+Restart OpenCode after installing the plugin. See
+[`docs/OPTIONAL-PROVIDER-SETUP.md`](docs/OPTIONAL-PROVIDER-SETUP.md#opencode)
+for the exact plugin path and verification steps.
+
 Default behavior is fail-open:
 
 - If `rtk` is missing, times out, or returns no rewrite, the original command runs.

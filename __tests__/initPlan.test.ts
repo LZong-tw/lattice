@@ -538,6 +538,8 @@ describe("lattice init install plan", () => {
     expect(doc).toContain("brew install ripgrep");
     expect(doc).toContain("sudo apt-get install -y ripgrep");
     expect(doc).toContain("rtk init -g --show");
+    expect(doc).toContain("rtk init -g --opencode");
+    expect(doc).toContain("OpenCode is handled by RTK's native OpenCode plugin");
     expect(doc).toContain("rtk gain");
     expect(doc).toContain("It does not install RTK");
     expect(doc).toContain("project-local RTK");

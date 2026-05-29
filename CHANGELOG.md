@@ -5,6 +5,16 @@ All notable changes to `@lzong.tw/lattice` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] — 2026-05-29
+
+### Added
+
+- RTK/OpenCode setup guidance: OpenCode should use RTK's native global plugin
+  via `rtk init -g --opencode`, while Lattice's `rtk` provider remains a
+  Claude Code/Codex fallback.
+- `doctor.mjs` now reports OpenCode CLI availability and whether the global RTK
+  OpenCode plugin file exists.
+
 ## [0.2.3] — 2026-05-29
 
 ### Fixed
@@ -150,6 +160,7 @@ First public release.
 See `reports/lattice-review-synthesis-2026-05-21.md` for the full review
 synthesis that drove this pass.
 
+[0.2.4]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.4
 [0.2.3]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.3
 [0.2.2]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.2
 [0.2.1]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.1
