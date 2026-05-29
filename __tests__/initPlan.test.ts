@@ -8,6 +8,7 @@ import {
   applyInstallPlan,
   buildInstallPlan,
   detectConsumerState,
+  detectInstalledClients,
   parseInitArgs,
   renderMarkdownPlan,
 } from "../init.mjs";
@@ -96,12 +97,86 @@ describe("lattice init install plan", () => {
     ).toEqual({
       consumerRoot: process.cwd(),
       clients: ["claude", "codex"],
+      clientsAuto: false,
       providers: ["serena", "rtk"],
       mount: "copy",
       format: "json",
       write: true,
       latticeRepoUrl: "git@example.com:lattice.git",
     });
+  });
+
+  it("accepts canonical client names and parses --clients auto", () => {
+    expect(parseInitArgs(["--clients", "claude-code,codex,copilot-cli"]).clients).toEqual([
+      "claude",
+      "codex",
+      "copilot",
+    ]);
+
+    expect(parseInitArgs(["--clients", "auto"])).toEqual({
+      consumerRoot: process.cwd(),
+      clients: [],
+      clientsAuto: true,
+      providers: [],
+      mount: "submodule",
+      format: "markdown",
+      write: false,
+      latticeRepoUrl: "<lattice-repo-url>",
+    });
+  });
+
+  it("detects installed supported clients from PATH probes", () => {
+    const runner = (command: string, args: string[]) => {
+      const joined = [command, ...args].join(" ");
+      const installed = [
+        "which claude",
+        "which codex",
+        "which gh",
+        "gh copilot --help",
+      ].includes(joined);
+      return { status: installed ? 0 : 1 };
+    };
+
+    expect(detectInstalledClients({ platform: "linux", runner }).clients).toEqual(["claude", "codex", "copilot"]);
+  });
+
+  it("wires every auto-detected client during write mode", () => {
+    const root = tempRepo();
+    mkdirSync(join(root, "hooks"));
+    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+      writeFileSync(join(root, "hooks", file), "", "utf8");
+    }
+
+    const result = applyInstallPlan({
+      consumerRoot: root,
+      clients: [],
+      clientsAuto: true,
+      clientDetection: {
+        clients: ["claude", "codex", "copilot"],
+        probes: [
+          { client: "claude", command: "claude", installed: true },
+          { client: "codex", command: "codex", installed: true },
+          { client: "copilot", command: "gh copilot --help", installed: true },
+        ],
+      },
+      providers: [],
+      mount: "submodule",
+      latticeRepoUrl: "<lattice-repo-url>",
+      format: "markdown",
+      write: true,
+    });
+
+    expect(result.selectedClients).toEqual(["claude", "codex", "copilot"]);
+    expect(result.appliedFiles).toEqual(
+      expect.arrayContaining([
+        ".claude/settings.json",
+        ".codex/config.toml",
+        ".codex/hooks.json",
+        ".github/hooks/repo-guardrails.json",
+      ]),
+    );
+    expect(renderMarkdownPlan(result)).toContain("## Client Auto-Detection");
+    expect(renderMarkdownPlan(result)).toContain("copilot: detected via `gh copilot --help`");
   });
 
   it("writes Claude, Codex, and AGENTS config when write mode is explicit", () => {
@@ -459,6 +534,10 @@ describe("lattice init install plan", () => {
     expect(doc).toContain("brew install rtk");
     expect(doc).toContain("curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh");
     expect(doc).toContain("cargo install --git https://github.com/rtk-ai/rtk rtk");
+    expect(doc).toContain("winget install --id BurntSushi.ripgrep.MSVC --exact");
+    expect(doc).toContain("brew install ripgrep");
+    expect(doc).toContain("sudo apt-get install -y ripgrep");
+    expect(doc).toContain("rtk init -g --show");
     expect(doc).toContain("rtk gain");
     expect(doc).toContain("It does not install RTK");
     expect(doc).toContain("project-local RTK");

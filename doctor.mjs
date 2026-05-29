@@ -35,6 +35,34 @@ function info(label) {
   console.log(`⚠ ${label}`);
 }
 
+function firstLine(value) {
+  return (value || "").trim().split(/\r?\n/)[0] || "";
+}
+
+function runCli(command, args = [], timeout = 10_000) {
+  const spec =
+    process.platform === "win32"
+      ? { command: "cmd.exe", args: ["/d", "/c", command, ...args] }
+      : { command, args };
+  return spawnSync(spec.command, spec.args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout,
+  });
+}
+
+function optionalCli(label, command, args = ["--version"], options = {}) {
+  const result = runCli(command, args, options.timeout ?? 10_000);
+  if (!result.error && result.status === 0) {
+    const output = firstLine(result.stdout) || firstLine(result.stderr);
+    pass(`${label} available${output ? ` — ${output}` : ""}`);
+    return true;
+  }
+
+  info(`${label} not found or not runnable${options.detail ? ` — ${options.detail}` : ""} (non-blocking)`);
+  return false;
+}
+
 // --- Node.js version ---
 const [major] = process.versions.node.split(".").map(Number);
 if (major >= 20) {
@@ -156,6 +184,15 @@ if (!uvxResult.error && uvxResult.status === 0) {
 } else {
   info("uvx not found — Serena/Semble launchers unavailable (non-blocking)");
 }
+
+// --- Optional AI-client and provider CLIs ---
+optionalCli("Claude Code CLI", "claude", ["--version"]);
+optionalCli("Codex CLI", "codex", ["--version"]);
+optionalCli("GitHub Copilot CLI", "gh", ["copilot", "--help"], {
+  detail: "requires gh plus the copilot extension",
+});
+optionalCli("RTK CLI", "rtk", ["--version"]);
+optionalCli("ripgrep", "rg", ["--version"]);
 
 // --- Summary ---
 console.log("");

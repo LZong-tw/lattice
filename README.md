@@ -52,13 +52,15 @@ Run from the consumer repo root. Works the same on macOS, Linux, and Windows
 
 ```
 pnpm add @lzong.tw/lattice
-npx @lzong.tw/lattice init --write --mount copy --clients claude-code,codex
+npx @lzong.tw/lattice init --write --mount copy --clients auto
 ```
 
 That single `init --write` call mounts lattice at `hooks/`, writes the client
 config files (`.claude/settings.json`, `.codex/config.toml`,
 `.codex/hooks.json`, optional Copilot config), and emits a managed `AGENTS.md`
-block. It is idempotent — rerun any time to refresh.
+block. With `--clients auto`, it detects installed supported CLIs (Claude Code,
+Codex CLI, and GitHub Copilot CLI) and wires every one it finds. It is
+idempotent — rerun any time to refresh.
 
 To preview without writing, drop `--write` (read-only plan output).
 
@@ -94,7 +96,8 @@ uvx --version
 # => required only for Serena/Semble MCP startup commands
 
 rtk --version
-# => required only when LATTICE_REQUIRE_RTK=1
+rg --version
+# => required only for RTK command rewrite / when LATTICE_REQUIRE_RTK=1
 ```
 
 ### Phase 2 — Mount lattice at `hooks/`
@@ -112,7 +115,7 @@ git submodule update --init --recursive
 
 ```
 pnpm add @lzong.tw/lattice
-npx @lzong.tw/lattice init --write --mount copy --clients claude-code,codex
+npx @lzong.tw/lattice init --write --mount copy --clients auto
 ```
 
 The `init --write --mount copy` step copies `node_modules/@lzong.tw/lattice`
@@ -137,6 +140,16 @@ If any command fails, re-run Phase 2 before editing client config.
 
 Pick every client that must work in this consumer repo.
 
+Shortcut for local machines:
+
+```
+node hooks/init.mjs --write --clients auto
+```
+
+That probes the installed supported CLIs and wires all detected clients. Use an
+explicit list such as `--clients claude-code,codex` when preparing config for a
+team repo that must support clients not installed on the current machine.
+
 | Client | Required files to create or update | Exact config section |
 |--------|------------------------------------|----------------------|
 | Claude Code | `.claude/settings.json` | [Claude Code Config](#claude-code-config) |
@@ -155,7 +168,7 @@ Only enable required providers. The hook layer works without them.
 |----------|----------------|----------------|
 | Serena | You want startup-time Serena MCP lifecycle and dashboard checks | Follow [docs/SERENA-CLIENT-SETUP.md](docs/SERENA-CLIENT-SETUP.md), then set `LATTICE_REQUIRE_SERENA_MCP=1` only after MCP config exists. |
 | Semble | You want code-search MCP available at startup | Add a stdio `semble` MCP entry to Claude/Codex config, then set `LATTICE_REQUIRE_SEMBLE_MCP=1` only after config exists. |
-| RTK | You want Bash command output rewritten through `rtk rewrite` | Install `rtk`; leave fail-open by default, or set `LATTICE_REQUIRE_RTK=1` only when missing RTK should block startup. |
+| RTK | You want Bash command output rewritten through `rtk rewrite` | Install `rtk` and `rg`; run `rtk init -g --show` to inspect native hook status; leave fail-open by default, or set `LATTICE_REQUIRE_RTK=1` only when missing RTK should block startup. |
 
 Reference docs:
 
@@ -706,6 +719,15 @@ that rewrites common shell commands to token-compacted `rtk ...` equivalents.
 The bundled `rtk` provider runs on Claude/Codex `PreToolUse` Bash commands and
 delegates the rewrite decision to `rtk rewrite`.
 
+RTK also expects `rg`/ripgrep for many rewrites. Install it once per machine
+(`winget install --id BurntSushi.ripgrep.MSVC --exact` on Windows,
+`brew install ripgrep` on macOS, or your Linux package manager), then restart
+already-open terminals so AI-client hooks see the updated PATH.
+
+Run `rtk init -g --show` to check RTK's native global hook status. If you enable
+RTK's native hooks, do not also enable the Lattice `rtk` provider in the same
+repo unless you intentionally want two rewrite layers.
+
 Default behavior is fail-open:
 
 - If `rtk` is missing, times out, or returns no rewrite, the original command runs.
@@ -735,7 +757,7 @@ An LLM agent can consider consumer setup **complete** when ALL of these pass:
 4. `node hooks/verification/smoke-plan.mjs pre-tool-deny <client>` → exits 0 (the commit gate fires)
 5. (If Serena) the configured `http://127.0.0.1:<port>/mcp` endpoint responds (see SERENA-CLIENT-SETUP.md)
 6. (If Semble) Claude/Codex MCP config contains a stdio `semble` entry
-7. (If RTK is required) `rtk --version` exits 0 in the AI client's hook environment
+7. (If RTK is required) `rtk --version` and `rg --version` exit 0 in the AI client's hook environment
 
 ---
 

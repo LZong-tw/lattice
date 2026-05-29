@@ -7,6 +7,7 @@
  */
 
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,6 +23,15 @@ const MOUNT_FILES = Object.freeze([
 const packageRoot = dirname(fileURLToPath(import.meta.url));
 const AGENTS_BEGIN = "<!-- lattice:init:v1:begin -->";
 const AGENTS_END = "<!-- lattice:init:v1:end -->";
+const SUPPORTED_CLIENTS = Object.freeze(["claude", "codex", "copilot"]);
+const CLIENT_ALIASES = Object.freeze({
+  claude: "claude",
+  "claude-code": "claude",
+  codex: "codex",
+  copilot: "copilot",
+  "copilot-cli": "copilot",
+});
+const SUPPORTED_CLIENT_HINT = "claude-code, codex, copilot-cli";
 
 function fileExists(root, relativePath) {
   return existsSync(resolve(root, relativePath));
@@ -46,6 +56,62 @@ function normalizeChoiceList(value, fallback) {
   return parsed.length > 0 ? parsed : [...fallback];
 }
 
+function normalizeClientChoice(value) {
+  return CLIENT_ALIASES[value] ?? value;
+}
+
+function normalizeClientList(value, fallback) {
+  const parsed = splitCsv(value).map(normalizeClientChoice);
+  return parsed.length > 0 ? [...new Set(parsed)] : [...fallback];
+}
+
+function commandExists(command, { platform = process.platform, runner = spawnSync } = {}) {
+  const probe =
+    platform === "win32"
+      ? { command: "where.exe", args: [command] }
+      : { command: "which", args: [command] };
+  const result = runner(probe.command, probe.args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5000,
+  });
+  return !result.error && result.status === 0;
+}
+
+function commandSucceeds(command, args, { runner = spawnSync } = {}) {
+  const result = runner(command, args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5000,
+  });
+  return !result.error && result.status === 0;
+}
+
+export function detectInstalledClients(options = {}) {
+  const detected = [];
+  const probes = [];
+
+  const claude = commandExists("claude", options);
+  probes.push({ client: "claude", command: "claude", installed: claude });
+  if (claude) detected.push("claude");
+
+  const codex = commandExists("codex", options);
+  probes.push({ client: "codex", command: "codex", installed: codex });
+  if (codex) detected.push("codex");
+
+  const gh = commandExists("gh", options);
+  const ghCopilot = gh && commandSucceeds("gh", ["copilot", "--help"], options);
+  probes.push({
+    client: "copilot",
+    command: "gh copilot --help",
+    installed: ghCopilot,
+    note: gh ? undefined : "gh not found",
+  });
+  if (ghCopilot) detected.push("copilot");
+
+  return { clients: detected, probes };
+}
+
 export function parseInitArgs(argv = process.argv.slice(2)) {
   const args = [...argv];
   if (args[0] === "init") args.shift();
@@ -53,6 +119,7 @@ export function parseInitArgs(argv = process.argv.slice(2)) {
   const options = {
     consumerRoot: process.cwd(),
     clients: [...DEFAULT_CLIENTS],
+    clientsAuto: false,
     providers: [...DEFAULT_PROVIDERS],
     mount: "submodule",
     format: "markdown",
@@ -71,7 +138,14 @@ export function parseInitArgs(argv = process.argv.slice(2)) {
     if (arg === "--consumer" || arg === "--repo") {
       options.consumerRoot = resolve(next());
     } else if (arg === "--clients") {
-      options.clients = normalizeChoiceList(next(), DEFAULT_CLIENTS);
+      const value = next();
+      if (value.trim().toLowerCase() === "auto") {
+        options.clients = [];
+        options.clientsAuto = true;
+      } else {
+        options.clients = normalizeClientList(value, DEFAULT_CLIENTS);
+        options.clientsAuto = false;
+      }
     } else if (arg === "--providers") {
       options.providers = normalizeChoiceList(next(), DEFAULT_PROVIDERS);
     } else if (arg === "--mount") {
@@ -96,6 +170,11 @@ export function parseInitArgs(argv = process.argv.slice(2)) {
   }
   if (!["markdown", "json"].includes(options.format)) {
     throw new Error("--format must be one of: markdown, json");
+  }
+  for (const client of options.clients) {
+    if (!SUPPORTED_CLIENTS.includes(client)) {
+      throw new Error(`unknown client "${client}"; use one of: ${SUPPORTED_CLIENT_HINT} or auto`);
+    }
   }
 
   return options;
@@ -226,8 +305,13 @@ function providerPhase(options) {
     phase.commands.push("rg '\"semble\"|\\bsemble\\b' .mcp.json .codex/config.toml");
   }
   if (options.providers.includes("rtk")) {
-    phase.actions.push("Install rtk, keep it fail-open first, and set LATTICE_REQUIRE_RTK=1 only after smoke testing.");
+    phase.actions.push(
+      "Install rtk plus ripgrep, confirm native RTK hook status for installed AI clients, and set LATTICE_REQUIRE_RTK=1 only after smoke testing.",
+    );
     phase.commands.push("rtk --version");
+    phase.commands.push("rg --version");
+    phase.commands.push("rtk gain");
+    phase.commands.push("rtk init -g --show");
   }
   if (phase.actions.length === 0) {
     phase.actions.push("No optional providers selected.");
@@ -266,6 +350,11 @@ export function buildInstallPlan(state, options) {
   if (!state.isGitRepo) {
     warnings.push("Consumer root is not a git repo; run this from the repository root or pass --consumer.");
   }
+  if (options.clientsAuto && options.clients.length === 0) {
+    warnings.push(
+      "No supported AI client CLI was detected; install Claude Code, Codex CLI, or GitHub Copilot CLI, or rerun with --clients <list>.",
+    );
+  }
   if (state.codex.usesDeprecatedHooksFlag) {
     warnings.push("Codex config uses deprecated [features].codex_hooks; replace it with [features].hooks.");
   }
@@ -273,6 +362,8 @@ export function buildInstallPlan(state, options) {
   return {
     generatedBy: "lattice init",
     consumerRoot: state.root,
+    clientsAuto: options.clientsAuto === true,
+    clientDetection: options.clientDetection,
     selectedClients: options.clients,
     selectedProviders: options.providers,
     mount: options.mount,
@@ -670,6 +761,7 @@ export function applyInstallPlan(options) {
   const merged = {
     consumerRoot: process.cwd(),
     clients: [...DEFAULT_CLIENTS],
+    clientsAuto: false,
     providers: [...DEFAULT_PROVIDERS],
     mount: "submodule",
     format: "markdown",
@@ -677,6 +769,10 @@ export function applyInstallPlan(options) {
     write: false,
     ...options,
   };
+  if (merged.clientsAuto) {
+    merged.clientDetection = merged.clientDetection ?? detectInstalledClients(merged.clientDetectionOptions ?? {});
+    merged.clients = merged.clientDetection.clients;
+  }
   const root = resolve(merged.consumerRoot);
   const appliedFiles = [];
   const extraWarnings = [];
@@ -733,6 +829,16 @@ export function renderMarkdownPlan(plan) {
     "",
   ];
 
+  if (plan.clientsAuto && plan.clientDetection?.probes?.length > 0) {
+    lines.push("## Client Auto-Detection", "");
+    for (const probe of plan.clientDetection.probes) {
+      const status = probe.installed ? "detected" : "missing";
+      const note = probe.note ? ` (${probe.note})` : "";
+      lines.push(`- ${probe.client}: ${status} via \`${probe.command}\`${note}`);
+    }
+    lines.push("");
+  }
+
   if (plan.appliedFiles?.length > 0) {
     lines.push("## Applied Files", "");
     for (const file of plan.appliedFiles) lines.push(`- ${file}`);
@@ -766,12 +872,12 @@ export function renderMarkdownPlan(plan) {
 function usage() {
   return [
     "Usage:",
-    "  lattice init [--consumer <repo>] [--clients claude,codex,copilot] [--providers serena,semble,rtk]",
+    "  lattice init [--consumer <repo>] [--clients auto|claude-code,codex,copilot-cli] [--providers serena,semble,rtk]",
     "  node hooks/init.mjs [same options]",
     "",
     "Options:",
     "  --consumer, --repo <path>       Consumer repo root. Defaults to cwd.",
-    "  --clients <list>               Comma list. Defaults to claude,codex.",
+    "  --clients <list|auto>          Comma list, or auto-detect installed supported CLIs. Defaults to claude,codex.",
     "  --providers <list>             Comma list. Defaults to none.",
     "  --mount submodule|copy         Mount strategy for hooks/. Defaults to submodule.",
     "  --lattice-repo-url <url>       URL used in the submodule command.",

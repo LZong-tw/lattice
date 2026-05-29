@@ -5,6 +5,19 @@ All notable changes to `@lzong.tw/lattice` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-05-29
+
+### Added
+
+- `lattice init --clients auto` now detects installed supported AI CLIs
+  (Claude Code, Codex CLI, and GitHub Copilot CLI) and wires every detected
+  client during `--write`.
+- `doctor.mjs` reports non-blocking local CLI readiness for Claude Code, Codex,
+  GitHub Copilot CLI, RTK, ripgrep, and uvx.
+- RTK setup docs now include cross-OS ripgrep installation plus the `rtk init
+  -g --show` native-hook status check, with guidance to avoid double command
+  rewrites when native RTK hooks and the Lattice RTK provider are both present.
+
 ## [0.2.1] — 2026-05-26
 
 ### Fixed
@@ -126,6 +139,7 @@ First public release.
 See `reports/lattice-review-synthesis-2026-05-21.md` for the full review
 synthesis that drove this pass.
 
+[0.2.2]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.2
 [0.2.1]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.1
 [0.2.0]: https://github.com/lzong-tw/lattice/releases/tag/v0.2.0
 [0.1.0]: https://github.com/lzong-tw/lattice/releases/tag/v0.1.0

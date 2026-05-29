@@ -110,16 +110,69 @@ If the install script is unavailable, use Cargo:
 cargo install --git https://github.com/rtk-ai/rtk rtk
 ```
 
+### Install ripgrep for RTK rewrites
+
+RTK rewrites many search commands to `rg`. Install ripgrep once per machine and
+verify it from the same shell your AI client launches hooks from:
+
+```bash
+# Windows
+winget install --id BurntSushi.ripgrep.MSVC --exact
+
+# macOS
+brew install ripgrep
+
+# Debian / Ubuntu
+sudo apt-get update
+sudo apt-get install -y ripgrep
+
+# Fedora
+sudo dnf install ripgrep
+
+# Arch
+sudo pacman -S ripgrep
+
+# Cargo fallback
+cargo install ripgrep
+```
+
+After installing on Windows, restart already-open terminals so the updated PATH
+is visible to Claude Code, Codex, and their hooks.
+
 Verify the binary is on the same PATH used by your AI-client hooks:
 
 ```bash
 command -v rtk
+command -v rg
 rtk --version
+rg --version
 rtk gain
 ```
 
+On Windows, use `where rtk` and `where rg` for the PATH checks.
+
 If hooks cannot see the binary, set `LATTICE_RTK_BIN` in the project hook
 environment to the absolute path from `command -v rtk`.
+
+### Native RTK hooks vs. Lattice RTK provider
+
+RTK also has its own global hook installer. Run this to inspect whether RTK
+has patched the installed AI clients on the machine:
+
+```bash
+rtk init -g --show
+```
+
+If RTK reports that no hook is installed, choose one rewrite layer:
+
+- **Native RTK hook mode:** run the `rtk init -g ...` command suggested by RTK
+  for the installed clients. In Lattice-managed repos, leave `--providers rtk`
+  off or set `LATTICE_RTK_DISABLED=1` so the same Bash command is not rewritten
+  twice.
+- **Lattice RTK provider mode:** keep RTK native hooks unpatched and enable the
+  Lattice `rtk` provider per repo. Some RTK versions may still print a global
+  "No hook installed" reminder; that is RTK's native-hook status, not proof that
+  Lattice failed to call `rtk rewrite`.
 
 Default behavior is fail-open:
 
