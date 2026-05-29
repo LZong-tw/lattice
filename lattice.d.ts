@@ -225,6 +225,80 @@ export function dispatch(
 ): Promise<number>;
 
 // ---------------------------------------------------------------------------
+// codex-plugin-hooks-repair
+// ---------------------------------------------------------------------------
+
+export interface CodexPluginHookRepairOptions {
+  codexHome?: string;
+  cacheRoot?: string;
+  env?: NodeJS.ProcessEnv;
+  files?: string[];
+  gitBashPath?: string;
+  gitBashCandidates?: string[];
+  platform?: NodeJS.Platform | string;
+  pluginRoot?: string;
+  write?: boolean;
+}
+
+export interface CodexPluginHookCommandResult {
+  command: string;
+  changed: boolean;
+  fixes: string[];
+  warnings: string[];
+}
+
+export interface CodexPluginHookFix {
+  path: string;
+  before: string;
+  after: string;
+  reason: string;
+}
+
+export interface CodexPluginHookWarning {
+  path: string;
+  warning: string;
+}
+
+export interface CodexPluginHookFileRepair {
+  filePath: string;
+  pluginRoot: string;
+  changed: boolean;
+  written: boolean;
+  fixes: CodexPluginHookFix[];
+  warnings: CodexPluginHookWarning[];
+}
+
+export interface CodexPluginHookRepairResult {
+  codexHome: string;
+  checked: number;
+  changed: number;
+  written: number;
+  files: CodexPluginHookFileRepair[];
+  warnings: CodexPluginHookWarning[];
+}
+
+export function defaultCodexHome(env?: NodeJS.ProcessEnv): string;
+export function findGitBash(candidates?: string[]): string;
+export function discoverCodexPluginHookFiles(options?: CodexPluginHookRepairOptions): string[];
+export function normalizeCodexPluginHookCommand(
+  command: string,
+  pluginRoot: string,
+  options?: CodexPluginHookRepairOptions,
+): CodexPluginHookCommandResult;
+export function repairCodexPluginHookFile(
+  hooksFile: string,
+  options?: CodexPluginHookRepairOptions,
+): CodexPluginHookFileRepair;
+export function repairCodexPluginHooks(
+  options?: CodexPluginHookRepairOptions,
+): CodexPluginHookRepairResult;
+export function formatCodexPluginHookRepairReport(
+  result: CodexPluginHookRepairResult,
+  options?: { write?: boolean },
+): string;
+export function assertHooksFileExists(hooksFile: string): void;
+
+// ---------------------------------------------------------------------------
 // testing (subpath: "@lzong.tw/lattice/testing")
 // ---------------------------------------------------------------------------
 

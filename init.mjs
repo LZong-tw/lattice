@@ -11,6 +11,11 @@ import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  formatCodexPluginHookRepairReport,
+  repairCodexPluginHooks,
+} from "./codex-plugin-hooks-repair.mjs";
+
 const DEFAULT_CLIENTS = Object.freeze(["claude", "codex"]);
 const DEFAULT_PROVIDERS = Object.freeze([]);
 const SERENA_UPSTREAM_SPEC = "git+https://github.com/oraios/serena";
@@ -176,6 +181,55 @@ export function parseInitArgs(argv = process.argv.slice(2)) {
     if (!SUPPORTED_CLIENTS.includes(client)) {
       throw new Error(`unknown client "${client}"; use one of: ${SUPPORTED_CLIENT_HINT} or auto`);
     }
+  }
+
+  return options;
+}
+
+export function parseRepairArgs(argv = process.argv.slice(2)) {
+  const args = [...argv];
+  if (args[0] === "repair") args.shift();
+  const target = args.shift();
+  if (target !== "codex-plugin-hooks") {
+    throw new Error('unknown repair target; use "codex-plugin-hooks"');
+  }
+
+  const options = {
+    write: false,
+    format: "markdown",
+  };
+
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    const next = () => {
+      i += 1;
+      if (i >= args.length) throw new Error(`missing value for ${arg}`);
+      return args[i];
+    };
+
+    if (arg === "--write") {
+      options.write = true;
+    } else if (arg === "--dry-run") {
+      options.write = false;
+    } else if (arg === "--codex-home") {
+      options.codexHome = resolve(next());
+    } else if (arg === "--cache-root") {
+      options.cacheRoot = resolve(next());
+    } else if (arg === "--git-bash") {
+      options.gitBashPath = next();
+    } else if (arg === "--json") {
+      options.format = "json";
+    } else if (arg === "--format") {
+      options.format = next();
+    } else if (arg === "--help" || arg === "-h") {
+      options.help = true;
+    } else {
+      throw new Error(`unknown option: ${arg}`);
+    }
+  }
+
+  if (!["markdown", "json"].includes(options.format)) {
+    throw new Error("--format must be one of: markdown, json");
   }
 
   return options;
@@ -891,6 +945,7 @@ function usage() {
   return [
     "Usage:",
     "  lattice init [--consumer <repo>] [--clients auto|claude-code,codex,copilot-cli] [--providers serena,semble,rtk]",
+    "  lattice repair codex-plugin-hooks [--write] [--codex-home <path>] [--git-bash <path>]",
     "  node hooks/init.mjs [same options]",
     "",
     "Options:",
@@ -902,11 +957,32 @@ function usage() {
     "  --format markdown|json         Output format. Defaults to markdown.",
     "  --json                         Shortcut for --format json.",
     "  --write                        Write managed client config and AGENTS.md.",
+    "",
+    "Repair commands:",
+    "  codex-plugin-hooks             Repair Codex plugin cache hooks.json manifests on Windows.",
+    "                                  Dry-run by default; add --write to apply.",
   ].join("\n");
 }
 
 async function main() {
-  const options = parseInitArgs();
+  const argv = process.argv.slice(2);
+  if (argv[0] === "repair") {
+    const options = parseRepairArgs(argv);
+    if (options.help) {
+      console.log(usage());
+      return;
+    }
+
+    const result = repairCodexPluginHooks(options);
+    if (options.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      process.stdout.write(formatCodexPluginHookRepairReport(result, options));
+    }
+    return;
+  }
+
+  const options = parseInitArgs(argv);
   if (options.help) {
     console.log(usage());
     return;
@@ -922,7 +998,7 @@ async function main() {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((err) => {
-    process.stderr.write(`lattice init: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`lattice: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);
   });
 }

@@ -91,6 +91,7 @@ const entryPoints = [
   "session-start.mjs",
   "provider-registry.mjs",
   "codex-hook-runner.mjs",
+  "codex-plugin-hooks-repair.mjs",
   "mcp-config-common.mjs",
   "pre-tool-policy.mjs",
   "protection.mjs",

@@ -625,6 +625,23 @@ node hooks/verification/smoke-plan.mjs post-compact codex
 node hooks/verification/smoke-plan.mjs pre-tool-deny codex
 ```
 
+#### Codex plugin cache repair
+
+Some global Codex plugins ship hook manifests that are valid on POSIX shells but
+break on Windows, especially commands containing a literal
+`${CLAUDE_PLUGIN_ROOT}` or a bare `bash` that resolves to the WindowsApps WSL
+shim. Lattice owns a local compatibility repair for those manifests:
+
+```powershell
+lattice repair codex-plugin-hooks
+lattice repair codex-plugin-hooks --write
+```
+
+The command scans `~/.codex/plugins/cache/**/hooks/hooks.json`, previews changes
+by default, and only writes when `--write` is passed. See
+[docs/CODEX-PLUGIN-HOOK-REPAIR.md](docs/CODEX-PLUGIN-HOOK-REPAIR.md) for the
+exact repair rules.
+
 ---
 
 ### Step 4 — Verification Profile (Optional)
@@ -1054,6 +1071,28 @@ Use the shell-neutral runner instead:
 
 This is the recommended shape when lattice runs beside clawback or other
 project-local hooks and only selected built-ins should be disabled.
+
+### Codex plugin hook exits 1 on Windows
+
+**Cause:** A global Codex plugin can install `hooks/hooks.json` commands that
+the Windows shell cannot run as written. Known cases include literal
+`${CLAUDE_PLUGIN_ROOT}` placeholders, bare `bash` resolving to the WindowsApps
+WSL shim, and noisy Codex companion Node warnings being surfaced in the UI.
+
+Preview the local repair:
+
+```powershell
+lattice repair codex-plugin-hooks
+```
+
+Apply it after reviewing the report:
+
+```powershell
+lattice repair codex-plugin-hooks --write
+```
+
+The repair is intentionally cache-local. Re-run it after installing or updating
+global Codex plugins.
 
 ### `node --check` fails on a hook file
 

@@ -5,6 +5,17 @@ All notable changes to `@lzong.tw/lattice` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] — 2026-05-29
+
+### Added
+
+- Added `lattice repair codex-plugin-hooks`, a dry-run-by-default compatibility
+  repair for Windows-hosted Codex global plugin hook manifests. It expands
+  literal `${CLAUDE_PLUGIN_ROOT}` placeholders, routes bare shell hooks through
+  Git Bash, and suppresses noisy Codex companion lifecycle warnings without
+  editing upstream plugin source.
+- Documented when to run the repair after Codex plugin installs or updates.
+
 ## [0.2.6] — 2026-05-29
 
 ### Fixed
