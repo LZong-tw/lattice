@@ -353,8 +353,11 @@ describe("Serena provider contracts", () => {
     expect(source).toContain("streamable-http");
     expect(source).toContain("--host");
     expect(source).toContain("127.0.0.1");
+    expect(source).toContain("--enable-web-dashboard");
     expect(source).toContain("--open-web-dashboard");
+    expect(source).toContain("--enable-gui-log-window");
     expect(source).toContain("detached: true");
+    expect(source).toContain("windowsHide: true");
     expect(source).toContain("getClientPaths");
   });
 

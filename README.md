@@ -666,6 +666,11 @@ If you do **not** want Serena, opt it out without disabling the rest:
 
 - `LATTICE_DISABLE=serena`
 
+Use that opt-out when Claude Code/Codex already point at a project-wide Serena
+HTTP singleton, for example `http://127.0.0.1:9127/mcp`. In that mode the
+client MCP config owns Serena and Lattice should not start its older per-client
+sidecar on ports 9122/9123.
+
 If you want the shared hooks without any provider at all, disable everything:
 
 - `LATTICE_PROVIDERS=none` (or `off` / `false` / `0`)

@@ -83,13 +83,21 @@ the stdio MCP tool config below. The shared starter runs:
 uvx --from git+https://github.com/oraios/serena serena start-mcp-server \
   --transport streamable-http --host 127.0.0.1 --port <port> \
   --context <context> --project <consumer-repo-root> \
-  --open-web-dashboard false
+  --enable-web-dashboard false \
+  --open-web-dashboard false \
+  --enable-gui-log-window false
 ```
 
 Launchers are **idempotent**: if Serena is already listening on the target port,
 the launcher exits 0 without starting a second instance.
 
-The process is **detached** and writes state files to the runtime directory.
+The process is **detached**, uses hidden Windows process launch settings, and
+writes state files to the runtime directory.
+
+If Claude Code/Codex already use a project-wide Serena HTTP singleton such as
+`http://127.0.0.1:9127/mcp`, disable this Lattice provider with
+`LATTICE_DISABLE=serena`. That keeps the repo hooks active but prevents the
+older per-client sidecar on ports 9122/9123 from launching in parallel.
 
 ### Stale Process Cleanup
 

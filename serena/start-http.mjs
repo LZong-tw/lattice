@@ -59,7 +59,10 @@ function uvxCommand(uvxArgs) {
 }
 
 const checkSpec = uvxCommand(["--version"]);
-const uvxCheck = spawnSync(checkSpec.command, checkSpec.args, { stdio: "ignore" });
+const uvxCheck = spawnSync(checkSpec.command, checkSpec.args, {
+  stdio: "ignore",
+  windowsHide: true,
+});
 if (uvxCheck.error) {
   console.error("uvx is required to launch Serena, but it was not found on PATH.");
   process.exit(1);
@@ -83,7 +86,11 @@ const args = [
   spec.context,
   "--project",
   repoRoot,
+  "--enable-web-dashboard",
+  "false",
   "--open-web-dashboard",
+  "false",
+  "--enable-gui-log-window",
   "false",
 ];
 
@@ -93,6 +100,7 @@ const child = spawn(launchSpec.command, launchSpec.args, {
   detached: true,
   stdio: ["ignore", logFd, logFd],
   env: { ...process.env },
+  windowsHide: true,
 });
 
 fs.closeSync(logFd);

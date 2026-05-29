@@ -42,6 +42,7 @@ export function bootstrapSerena(client) {
   const result = spawnSync(process.execPath, [startHttpScript, spec.client], {
     cwd: serenaDir,
     stdio: "inherit",
+    windowsHide: true,
   });
 
   if (result.error) {
