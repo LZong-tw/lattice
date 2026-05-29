@@ -19,7 +19,7 @@ const repoRoot = resolve(packageRoot, "..");
 const node = process.execPath;
 
 function codexDispatcherCommand(target: "session-start.mjs" | "pre-tool-policy.mjs") {
-  return `LATTICE_HOOK_TARGET=${target} LATTICE_HOOK_CLIENT=codex node --input-type=module -e "import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})"`;
+  return `node --input-type=module -e "import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['${target}','codex'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})"`;
 }
 
 function runHook(
@@ -44,10 +44,10 @@ function runHook(
 
 const consumerConfigFixtures = {
   claude: {
-    sessionStart: 'node "$CLAUDE_PROJECT_DIR"/hooks/session-start.mjs claude-code',
-    preToolUse: 'node "$CLAUDE_PROJECT_DIR"/hooks/pre-tool-policy.mjs claude-code',
-    postToolUse: 'node "$CLAUDE_PROJECT_DIR"/hooks/post-tool-reminder.mjs claude-code',
-    stop: 'node "$CLAUDE_PROJECT_DIR"/hooks/stop-checklist.mjs',
+    sessionStart: "hooks/hook-runner.mjs session-start.mjs claude-code",
+    preToolUse: "hooks/hook-runner.mjs pre-tool-policy.mjs claude-code",
+    postToolUse: "hooks/hook-runner.mjs post-tool-reminder.mjs claude-code",
+    stop: "hooks/hook-runner.mjs stop-checklist.mjs claude-code",
   },
   copilot: {
     sessionStart: "node ./hooks/session-start.mjs copilot",
@@ -61,10 +61,11 @@ const consumerConfigFixtures = {
 
 describe("consumer path contract", () => {
   it("documents stable hooks mount paths for all supported clients", () => {
-    expect(consumerConfigFixtures.claude.sessionStart).toContain("hooks/session-start.mjs");
-    expect(consumerConfigFixtures.claude.preToolUse).toContain("hooks/pre-tool-policy.mjs");
-    expect(consumerConfigFixtures.claude.postToolUse).toContain("hooks/post-tool-reminder.mjs");
-    expect(consumerConfigFixtures.claude.stop).toContain("hooks/stop-checklist.mjs");
+    expect(consumerConfigFixtures.claude.sessionStart).toContain("hooks/hook-runner.mjs");
+    expect(consumerConfigFixtures.claude.sessionStart).toContain("session-start.mjs");
+    expect(consumerConfigFixtures.claude.preToolUse).toContain("pre-tool-policy.mjs");
+    expect(consumerConfigFixtures.claude.postToolUse).toContain("post-tool-reminder.mjs");
+    expect(consumerConfigFixtures.claude.stop).toContain("stop-checklist.mjs");
 
     expect(consumerConfigFixtures.copilot.sessionStart).toContain("hooks/session-start.mjs");
     expect(consumerConfigFixtures.copilot.preToolUse).toContain("hooks/pre-tool-policy.mjs");
@@ -95,10 +96,26 @@ describe("runtime process contract", () => {
       expect(source, file).not.toMatch(/\bshell\s*:\s*true\b/);
     }
   });
+
+  it("keeps generated Codex commands shell-neutral for Windows", () => {
+    const command = codexDispatcherCommand("pre-tool-policy.mjs");
+
+    expect(command).not.toContain("LATTICE_HOOK_TARGET=");
+    expect(command).not.toContain("LATTICE_HOOK_CLIENT=");
+    expect(command).toContain("__latticeHookArgs");
+    expect(command).toContain("codex-hook-runner.mjs");
+  });
+
+  it("keeps generated Claude commands independent of shell variable expansion", () => {
+    const command = consumerConfigFixtures.claude.preToolUse;
+
+    expect(command).toContain("hooks/hook-runner.mjs");
+    expect(command).toContain("pre-tool-policy.mjs");
+    expect(command).not.toContain("$CLAUDE_PROJECT_DIR");
+  });
 });
 
 describe("hook entry-point behavior", () => {
-  // Codex Windows path uses a different dispatcher; not yet covered. See cross-platform review 2026-05-21.
   it.skipIf(process.platform === "win32")("dispatches Codex project hooks from payload cwd instead of shell cwd", () => {
     const consumerRoot = mkdtempSync(join(tmpdir(), "lattice-codex-consumer-"));
     symlinkSync(packageRoot, join(consumerRoot, "hooks"), "dir");
@@ -133,6 +150,67 @@ describe("hook entry-point behavior", () => {
         }),
       }),
     );
+  });
+
+  it("runs the Codex hook runner with argv instead of env-prefix configuration", () => {
+    const result = spawnSync(
+      node,
+      [resolve(packageRoot, "codex-hook-runner.mjs"), "pre-tool-policy.mjs", "codex"],
+      {
+        input: JSON.stringify({
+          cwd: packageRoot,
+          tool_name: "Bash",
+          tool_input: { command: "git commit -m test" },
+        }),
+        encoding: "utf8",
+        cwd: dirname(packageRoot),
+      },
+    );
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(
+      expect.objectContaining({
+        hookSpecificOutput: expect.objectContaining({
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+        }),
+      }),
+    );
+  });
+
+  it("runs hook targets with portable --env assignments for Clawback compatibility", () => {
+    const result = spawnSync(
+      node,
+      [
+        resolve(packageRoot, "hook-runner.mjs"),
+        "pre-tool-policy.mjs",
+        "claude-code",
+        "--env",
+        "LATTICE_RTK_DISABLED=1",
+        "--env",
+        "LATTICE_DISABLE=serena,lattice/protection,lattice/stop-checklist",
+      ],
+      {
+        input: JSON.stringify({
+          cwd: packageRoot,
+          tool_name: "Bash",
+          tool_input: { command: "git status" },
+        }),
+        encoding: "utf8",
+        cwd: dirname(packageRoot),
+      },
+    );
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain("LATTICE_RTK_DISABLED=1");
   });
 
   it("denies shell git commit for Copilot JSON hooks", () => {

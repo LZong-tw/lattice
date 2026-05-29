@@ -98,6 +98,9 @@ If Claude Code/Codex already use a project-wide Serena HTTP singleton such as
 `http://127.0.0.1:9127/mcp`, disable this Lattice provider with
 `LATTICE_DISABLE=serena`. That keeps the repo hooks active but prevents the
 older per-client sidecar on ports 9122/9123 from launching in parallel.
+On Windows hook configs, write that opt-out through
+`hook-runner.mjs --env LATTICE_DISABLE=serena` instead of a POSIX
+`LATTICE_DISABLE=serena node ...` prefix.
 
 ### Stale Process Cleanup
 
@@ -181,6 +184,12 @@ printf '{}\n' | env LATTICE_REQUIRE_SERENA_MCP=1 node hooks/session-start.mjs cl
 # => exit: 0
 ```
 
+PowerShell equivalent:
+
+```powershell
+'{}' | node hooks/hook-runner.mjs session-start.mjs claude-code --env LATTICE_REQUIRE_SERENA_MCP=1
+```
+
 ### GitHub Copilot CLI + Serena
 
 The base hooks config in `.github/hooks/repo-guardrails.json` (see [README](../README.md#github-copilot-cli-config))
@@ -241,6 +250,12 @@ curl -sf http://127.0.0.1:9123/mcp -o /dev/null && echo "OK" || echo "FAIL"
 
 printf '{}\n' | env LATTICE_REQUIRE_SERENA_MCP=1 node hooks/session-start.mjs codex
 # => exit: 0
+```
+
+PowerShell equivalent:
+
+```powershell
+'{}' | node hooks/hook-runner.mjs session-start.mjs codex --env LATTICE_REQUIRE_SERENA_MCP=1
 ```
 
 ---

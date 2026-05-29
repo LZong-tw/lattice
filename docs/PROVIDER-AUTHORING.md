@@ -395,15 +395,22 @@ include short summaries; this table is the source of truth.
 | `LATTICE_EXTRA_PROVIDERS` | `register-builtins.mjs` | Comma-separated npm specifiers `import()`ed at startup to register external providers. |
 | `LATTICE_REPO_ROOT` | `common.mjs`, `context.mjs` | Override the auto-detected consumer repo root. |
 | `LATTICE_STATE_NAMESPACE` | `common.mjs` | Override the state directory namespace under `$XDG_STATE_HOME/`. |
-| `LATTICE_SESSION_KIND` | `codex-hook-runner.mjs` | Codex SessionStart variant marker (`startup` / `resume`). |
+| `LATTICE_SESSION_KIND` | `hook-runner.mjs`, `codex-hook-runner.mjs` | SessionStart variant marker (`startup` / `resume` / `compact`). Prefer `--session-kind <kind>` in generated hook commands. |
 | `LATTICE_TIMEOUT_*` | `timeouts.mjs` | Per-event timeout overrides — see [Per-event timeouts](#per-event-timeouts). |
 
 ### Codex runner
 
 | Variable | Used by | Purpose |
 |---|---|---|
-| `LATTICE_HOOK_TARGET` | `codex-hook-runner.mjs` | Hook script filename the Codex runner should forward stdin to (e.g. `session-start.mjs`, `pre-tool-policy.mjs`). |
-| `LATTICE_HOOK_CLIENT` | `codex-hook-runner.mjs` | Client argument passed to the forwarded hook script (typically `codex`). |
+| `LATTICE_HOOK_TARGET` | `codex-hook-runner.mjs` | Legacy env fallback for the hook script filename. New configs pass the target as argv to avoid Windows env-prefix failures. |
+| `LATTICE_HOOK_CLIENT` | `codex-hook-runner.mjs` | Legacy env fallback for the forwarded client argument. New configs pass the client as argv. |
+
+For cross-shell consumer config, prefer:
+
+```bash
+node hooks/hook-runner.mjs pre-tool-policy.mjs claude-code --env LATTICE_DISABLE=serena
+node hooks/codex-hook-runner.mjs pre-tool-policy.mjs codex
+```
 
 ### Built-in providers
 

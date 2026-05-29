@@ -5,6 +5,19 @@ All notable changes to `@lzong.tw/lattice` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] — 2026-05-29
+
+### Fixed
+
+- Added `hook-runner.mjs`, a shell-neutral wrapper for applying
+  `--env KEY=VALUE` hook options without POSIX env-prefix syntax. This keeps
+  lattice usable beside clawback/project hooks on Windows PowerShell and cmd.exe.
+- Codex hook dispatch now passes the target/client through argv instead of
+  `LATTICE_HOOK_TARGET=... LATTICE_HOOK_CLIENT=...` command prefixes, while
+  retaining the env fallback for older configs.
+- Docs now show the portable runner shape for clawback-compatible provider
+  opt-outs such as `LATTICE_DISABLE=serena,lattice/protection`.
+
 ## [0.2.5] — 2026-05-29
 
 ### Fixed

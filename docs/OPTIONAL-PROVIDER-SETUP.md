@@ -40,6 +40,12 @@ printf '{}\n' | env LATTICE_REQUIRE_SEMBLE_MCP=1 node hooks/session-start.mjs cl
 # => exit: 0
 ```
 
+On Windows, use the portable runner instead of POSIX env-prefix syntax:
+
+```powershell
+'{}' | node hooks/hook-runner.mjs session-start.mjs claude-code --env LATTICE_REQUIRE_SEMBLE_MCP=1
+```
+
 ### Codex CLI
 
 Add or merge this into `.codex/config.toml`:
@@ -58,6 +64,12 @@ uvx --version
 
 printf '{}\n' | env LATTICE_REQUIRE_SEMBLE_MCP=1 node hooks/session-start.mjs codex
 # => exit: 0
+```
+
+On Windows:
+
+```powershell
+'{}' | node hooks/hook-runner.mjs session-start.mjs codex --env LATTICE_REQUIRE_SEMBLE_MCP=1
 ```
 
 ### Init Shortcut
@@ -234,6 +246,13 @@ printf '{}\n' | env LATTICE_REQUIRE_RTK=1 node hooks/session-start.mjs codex
 echo '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}' \
   | env LATTICE_PROVIDER=rtk node hooks/pre-tool-policy.mjs codex
 # => exits 0; may return updatedInput.command when RTK chooses a rewrite
+```
+
+On Windows:
+
+```powershell
+'{}' | node hooks/hook-runner.mjs session-start.mjs codex --env LATTICE_REQUIRE_RTK=1
+'{"tool_name":"Bash","tool_input":{"command":"ls -la"}}' | node hooks/hook-runner.mjs pre-tool-policy.mjs codex --env LATTICE_PROVIDER=rtk
 ```
 
 Do not copy `LATTICE_PROVIDER=rtk` or `LATTICE_PROVIDERS=rtk` into project hook

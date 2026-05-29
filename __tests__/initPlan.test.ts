@@ -55,6 +55,7 @@ describe("lattice init install plan", () => {
     mkdirSync(join(root, "hooks"));
     writeFileSync(join(root, "hooks/common.mjs"), "", "utf8");
     writeFileSync(join(root, "hooks/session-start.mjs"), "", "utf8");
+    writeFileSync(join(root, "hooks/hook-runner.mjs"), "", "utf8");
     writeFileSync(join(root, "hooks/codex-hook-runner.mjs"), "", "utf8");
     writeFileSync(join(root, "hooks/pre-tool-policy.mjs"), "", "utf8");
     mkdirSync(join(root, ".codex"));
@@ -143,7 +144,7 @@ describe("lattice init install plan", () => {
   it("wires every auto-detected client during write mode", () => {
     const root = tempRepo();
     mkdirSync(join(root, "hooks"));
-    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+    for (const file of ["common.mjs", "session-start.mjs", "hook-runner.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
       writeFileSync(join(root, "hooks", file), "", "utf8");
     }
 
@@ -182,7 +183,7 @@ describe("lattice init install plan", () => {
   it("writes Claude, Codex, and AGENTS config when write mode is explicit", () => {
     const root = tempRepo();
     mkdirSync(join(root, "hooks"));
-    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+    for (const file of ["common.mjs", "session-start.mjs", "hook-runner.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
       writeFileSync(join(root, "hooks", file), "", "utf8");
     }
 
@@ -205,7 +206,10 @@ describe("lattice init install plan", () => {
       ]),
     );
     expect(JSON.parse(readFileSync(join(root, ".claude/settings.json"), "utf8")).hooks.SessionStart[0].hooks[0].command).toContain(
-      "hooks/session-start.mjs claude",
+      "hooks/hook-runner.mjs",
+    );
+    expect(JSON.parse(readFileSync(join(root, ".claude/settings.json"), "utf8")).hooks.SessionStart[0].hooks[0].command).toContain(
+      "session-start.mjs",
     );
     expect(JSON.parse(readFileSync(join(root, ".claude/settings.json"), "utf8")).hooks.SessionStart[0].matcher).toBe("startup|resume|compact");
     expect(readFileSync(join(root, ".codex/config.toml"), "utf8")).toContain("hooks = true");
@@ -284,7 +288,7 @@ describe("lattice init install plan", () => {
   it("writes provider MCP config that satisfies Serena and Semble startup guards", () => {
     const root = tempRepo();
     mkdirSync(join(root, "hooks"));
-    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+    for (const file of ["common.mjs", "session-start.mjs", "hook-runner.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
       writeFileSync(join(root, "hooks", file), "", "utf8");
     }
 
@@ -339,7 +343,7 @@ describe("lattice init install plan", () => {
   it("is idempotent when write mode runs more than once", () => {
     const root = tempRepo();
     mkdirSync(join(root, "hooks"));
-    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+    for (const file of ["common.mjs", "session-start.mjs", "hook-runner.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
       writeFileSync(join(root, "hooks", file), "", "utf8");
     }
 
@@ -371,7 +375,7 @@ describe("lattice init install plan", () => {
   it("replaces deprecated Codex hook feature config during write mode", () => {
     const root = tempRepo();
     mkdirSync(join(root, "hooks"));
-    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+    for (const file of ["common.mjs", "session-start.mjs", "hook-runner.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
       writeFileSync(join(root, "hooks", file), "", "utf8");
     }
     mkdirSync(join(root, ".codex"));
@@ -397,7 +401,7 @@ describe("lattice init install plan", () => {
     const root = tempRepo();
     const pkgDir = join(root, "node_modules/@lzong.tw/lattice");
     mkdirSync(pkgDir, { recursive: true });
-    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+    for (const file of ["common.mjs", "session-start.mjs", "hook-runner.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
       writeFileSync(join(pkgDir, file), `// stub ${file}\n`, "utf8");
     }
 
@@ -430,7 +434,7 @@ describe("lattice init install plan", () => {
     const root = tempRepo();
     const pkgDir = join(root, "node_modules/@lzong.tw/lattice");
     mkdirSync(pkgDir, { recursive: true });
-    for (const file of ["common.mjs", "session-start.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
+    for (const file of ["common.mjs", "session-start.mjs", "hook-runner.mjs", "codex-hook-runner.mjs", "pre-tool-policy.mjs"]) {
       writeFileSync(join(pkgDir, file), `// stub ${file}\n`, "utf8");
     }
 

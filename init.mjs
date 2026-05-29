@@ -17,6 +17,7 @@ const SERENA_UPSTREAM_SPEC = "git+https://github.com/oraios/serena";
 const MOUNT_FILES = Object.freeze([
   "hooks/common.mjs",
   "hooks/session-start.mjs",
+  "hooks/hook-runner.mjs",
   "hooks/codex-hook-runner.mjs",
   "hooks/pre-tool-policy.mjs",
 ]);
@@ -456,7 +457,7 @@ function claudeSettings() {
           hooks: [
             {
               type: "command",
-              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/session-start.mjs claude-code',
+              command: hookDispatcherCommand("session-start.mjs", "claude-code"),
               timeout: 15,
             },
           ],
@@ -468,7 +469,7 @@ function claudeSettings() {
           hooks: [
             {
               type: "command",
-              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/pre-tool-policy.mjs claude-code',
+              command: hookDispatcherCommand("pre-tool-policy.mjs", "claude-code"),
               timeout: 15,
             },
           ],
@@ -480,7 +481,7 @@ function claudeSettings() {
           hooks: [
             {
               type: "command",
-              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/post-tool-reminder.mjs claude-code',
+              command: hookDispatcherCommand("post-tool-reminder.mjs", "claude-code"),
               timeout: 15,
             },
           ],
@@ -491,7 +492,7 @@ function claudeSettings() {
           hooks: [
             {
               type: "command",
-              command: 'node "$CLAUDE_PROJECT_DIR"/hooks/stop-checklist.mjs',
+              command: hookDispatcherCommand("stop-checklist.mjs", "claude-code"),
               timeout: 15,
             },
           ],
@@ -501,13 +502,30 @@ function claudeSettings() {
   };
 }
 
-function codexDispatcherCommand(target, extraEnv = "") {
-  const prefix = [
-    extraEnv,
-    `LATTICE_HOOK_TARGET=${target}`,
-    "LATTICE_HOOK_CLIENT=codex",
-  ].filter(Boolean).join(" ");
-  return `${prefix} node --input-type=module -e "import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})"`;
+function hookArgsLiteral(args) {
+  return `[${args
+    .map((arg) => `'${String(arg).replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`)
+    .join(",")}]`;
+}
+
+function hookDispatcherCommand(target, client, options = {}) {
+  const args = [target, client];
+  if (options.sessionKind) {
+    args.push("--session-kind", options.sessionKind);
+  }
+  for (const assignment of options.env ?? []) {
+    args.push("--env", assignment);
+  }
+
+  const runnerFile = options.runnerFile || (client === "codex" ? "codex-hook-runner.mjs" : "hook-runner.mjs");
+  const argsLiteral = hookArgsLiteral(args);
+  const runnerLiteral = String(runnerFile).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+
+  return `node --input-type=module -e "import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','${runnerLiteral}');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=${argsLiteral};await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/${runnerLiteral} from '+start);process.exit(1)})"`;
+}
+
+function codexDispatcherCommand(target, options = {}) {
+  return hookDispatcherCommand(target, "codex", options);
 }
 
 function codexHooksJson() {
@@ -530,7 +548,7 @@ function codexHooksJson() {
           hooks: [
             {
               type: "command",
-              command: codexDispatcherCommand("session-start.mjs", "LATTICE_SESSION_KIND=resume"),
+              command: codexDispatcherCommand("session-start.mjs", { sessionKind: "resume" }),
               statusMessage: "Recovering session context",
               timeout: 15,
             },
@@ -541,7 +559,7 @@ function codexHooksJson() {
           hooks: [
             {
               type: "command",
-              command: codexDispatcherCommand("session-start.mjs", "LATTICE_SESSION_KIND=compact"),
+              command: codexDispatcherCommand("session-start.mjs", { sessionKind: "compact" }),
               statusMessage: "Recovering compacted session context",
               timeout: 15,
             },

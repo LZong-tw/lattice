@@ -35,6 +35,11 @@ those gates into a working guardrail.
 Other providers (Serena MCP, Semble MCP, RTK command rewrite) ship in-tree
 and are opt-in through the install planner's `--providers` flag.
 
+When a repo keeps existing clawback/project hooks beside lattice, do not use
+shell env-prefix commands such as `LATTICE_DISABLE=... node ...` on Windows.
+Use `hook-runner.mjs --env KEY=VALUE` so the same config works in PowerShell,
+cmd.exe, Bash, Claude Code, and Codex.
+
 ---
 
 ## Agent Start Here
@@ -129,6 +134,7 @@ that stable path.
 ```
 node --check hooks/common.mjs
 node --check hooks/session-start.mjs
+node --check hooks/hook-runner.mjs
 node --check hooks/codex-hook-runner.mjs
 node --check hooks/pre-tool-policy.mjs
 # => each command exits 0
@@ -329,7 +335,8 @@ START
 | Built-in registration | `register-builtins.mjs` | Self-registers built-in providers; also loads `LATTICE_EXTRA_PROVIDERS=<spec>` packages. |
 | Built-in providers | `builtins/` | `protection`, `commit-checkpoint`, `screenshot-reminder`, `edit-reminder`, `stop-checklist` v1 providers. |
 | Shared runtime | `*.mjs` (root) | Client-agnostic hook entry points and policy logic (`session-start.mjs`, `pre-tool-policy.mjs`, `stop-checklist.mjs`, etc.). |
-| Codex runner | `codex-hook-runner.mjs` | Forwards Codex hook payloads to the right entry script (driven by `LATTICE_HOOK_TARGET` / `LATTICE_HOOK_CLIENT`). |
+| Hook runner | `hook-runner.mjs` | Shell-neutral wrapper that forwards stdin to a hook target and applies `--env KEY=VALUE` assignments without POSIX env-prefix syntax. |
+| Codex runner | `codex-hook-runner.mjs` | Forwards Codex hook payloads to the right entry script (driven by argv, with legacy `LATTICE_HOOK_TARGET` / `LATTICE_HOOK_CLIENT` env fallback). |
 | Testing helpers | `testing.mjs` | `mockContext`, `runProvider`, `mockPayload` — published as `@lzong.tw/lattice/testing`. |
 | MCP config helpers | `mcp-config-common.mjs` | Shared JSON/TOML parser utilities for startup MCP guards. |
 | File protection | `protection.mjs` | Edit guard for env files, `.git/`, and detected lockfiles. |
@@ -392,8 +399,8 @@ git submodule update --init --recursive
 Expected result:
 
 ```bash
-ls hooks/common.mjs hooks/session-start.mjs hooks/codex-hook-runner.mjs hooks/pre-tool-policy.mjs
-# => hooks/common.mjs  hooks/session-start.mjs  hooks/codex-hook-runner.mjs  hooks/pre-tool-policy.mjs
+ls hooks/common.mjs hooks/session-start.mjs hooks/hook-runner.mjs hooks/codex-hook-runner.mjs hooks/pre-tool-policy.mjs
+# => hooks/common.mjs  hooks/session-start.mjs  hooks/hook-runner.mjs  hooks/codex-hook-runner.mjs  hooks/pre-tool-policy.mjs
 ```
 
 **Option B: Directory copy**
@@ -409,7 +416,7 @@ so existing config commands remain valid.
 
 ```bash
 cd /path/to/your-consumer-repo
-node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs && echo "OK"
+node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/hook-runner.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs && echo "OK"
 # => OK
 ```
 
@@ -436,7 +443,7 @@ and a smoke test.
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/session-start.mjs claude-code",
+            "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['session-start.mjs','claude-code'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/hook-runner.mjs from '+start);process.exit(1)})\"",
             "timeout": 15
           }
         ]
@@ -448,7 +455,7 @@ and a smoke test.
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/pre-tool-policy.mjs claude-code",
+            "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['pre-tool-policy.mjs','claude-code'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/hook-runner.mjs from '+start);process.exit(1)})\"",
             "timeout": 15
           }
         ]
@@ -460,7 +467,7 @@ and a smoke test.
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/post-tool-reminder.mjs claude-code",
+            "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['post-tool-reminder.mjs','claude-code'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/hook-runner.mjs from '+start);process.exit(1)})\"",
             "timeout": 15
           }
         ]
@@ -471,7 +478,7 @@ and a smoke test.
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/hooks/stop-checklist.mjs",
+            "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['stop-checklist.mjs','claude-code'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/hook-runner.mjs from '+start);process.exit(1)})\"",
             "timeout": 15
           }
         ]
@@ -564,7 +571,7 @@ from the hook payload `cwd` and then forwards stdin to the real hook script.
         "hooks": [
           {
             "type": "command",
-            "command": "LATTICE_HOOK_TARGET=session-start.mjs LATTICE_HOOK_CLIENT=codex node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
+            "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['session-start.mjs','codex'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
             "statusMessage": "Checking lattice startup",
             "timeout": 15
           }
@@ -575,7 +582,7 @@ from the hook payload `cwd` and then forwards stdin to the real hook script.
         "hooks": [
           {
             "type": "command",
-            "command": "LATTICE_SESSION_KIND=resume LATTICE_HOOK_TARGET=session-start.mjs LATTICE_HOOK_CLIENT=codex node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
+            "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['session-start.mjs','codex','--session-kind','resume'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
             "statusMessage": "Recovering session context",
             "timeout": 15
           }
@@ -586,7 +593,7 @@ from the hook payload `cwd` and then forwards stdin to the real hook script.
         "hooks": [
           {
             "type": "command",
-            "command": "LATTICE_SESSION_KIND=compact LATTICE_HOOK_TARGET=session-start.mjs LATTICE_HOOK_CLIENT=codex node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
+            "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['session-start.mjs','codex','--session-kind','compact'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
             "statusMessage": "Recovering compacted session context",
             "timeout": 15
           }
@@ -599,7 +606,7 @@ from the hook payload `cwd` and then forwards stdin to the real hook script.
         "hooks": [
           {
             "type": "command",
-            "command": "LATTICE_HOOK_TARGET=pre-tool-policy.mjs LATTICE_HOOK_CLIENT=codex node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
+            "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','codex-hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['pre-tool-policy.mjs','codex'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/codex-hook-runner.mjs from '+start);process.exit(1)})\"",
             "statusMessage": "Applying lattice guardrails",
             "timeout": 15
           }
@@ -639,7 +646,7 @@ Enable the Stop verification gate by setting this on the Stop hook command:
 ```jsonc
 {
   "type": "command",
-  "command": "LATTICE_VERIFY_ON_STOP=1 node \"$CLAUDE_PROJECT_DIR\"/hooks/stop-checklist.mjs",
+  "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['stop-checklist.mjs','claude-code','--env','LATTICE_VERIFY_ON_STOP=1'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/hook-runner.mjs from '+start);process.exit(1)})\"",
   "timeout": 75
 }
 ```
@@ -773,7 +780,7 @@ LATTICE_REQUIRE_RTK=1
 
 An LLM agent can consider consumer setup **complete** when ALL of these pass:
 
-1. `node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs` → exits 0
+1. `node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/hook-runner.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs` → exits 0
 2. The client config file exists at the correct path (see per-client sections above)
 3. `node hooks/verification/smoke-plan.mjs session-start <client>` → exits 0 for each wired client (`claude-code`, `codex`, `copilot-cli`)
 4. `node hooks/verification/smoke-plan.mjs pre-tool-deny <client>` → exits 0 (the commit gate fires)
@@ -959,8 +966,8 @@ Tests cover:
 returning a blocking failure.
 
 The shell snippets below use POSIX pipes (`echo … | env VAR=… node …`).
-On Windows, run them under Git Bash, WSL, or rewrite as PowerShell
-(`$env:LATTICE_PROVIDER='none'; '...' | node hooks/pre-tool-policy.mjs ...`).
+On Windows, prefer the portable runner:
+`'...' | node hooks/hook-runner.mjs pre-tool-policy.mjs codex --env LATTICE_PROVIDER=none`.
 
 ```bash
 # First isolate the shared hook layer:
@@ -1030,6 +1037,23 @@ ls hooks/codex-hook-runner.mjs
 If the file exists, make sure `.codex/hooks.json` uses the command from
 [Codex CLI Config](#codex-cli-config). Do not replace it with a short
 `git rev-parse` command; Codex hook cwd is not always the repo root.
+
+### `LATTICE_DISABLE=...` is not recognized on Windows
+
+**Cause:** The hook command uses POSIX env-prefix syntax. PowerShell and cmd.exe
+do not understand `KEY=value node ...`.
+
+Use the shell-neutral runner instead:
+
+```jsonc
+{
+  "type": "command",
+  "command": "node --input-type=module -e \"import{existsSync}from'node:fs';import{resolve,dirname}from'node:path';import{pathToFileURL}from'node:url';let raw='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>raw+=c);process.stdin.on('end',async()=>{let p={};try{p=JSON.parse(raw||'{}')}catch{};let start=process.env.CLAUDE_PROJECT_DIR||process.env.CLAUDE_PROJECT_ROOT||process.env.CODEX_PROJECT_DIR||process.env.CODEX_WORKSPACE_ROOT||p.cwd||p.current_working_directory||process.cwd();for(let dir=resolve(start);;dir=dirname(dir)){let runner=resolve(dir,'hooks','hook-runner.mjs');if(existsSync(runner)){globalThis.__latticeHookStdin=raw;globalThis.__latticeHookArgs=['pre-tool-policy.mjs','claude-code','--env','LATTICE_DISABLE=serena,lattice/protection,lattice/stop-checklist','--env','LATTICE_RTK_DISABLED=1'];await import(pathToFileURL(runner));return}let parent=dirname(dir);if(parent===dir)break}console.error('lattice: cannot find hooks/hook-runner.mjs from '+start);process.exit(1)})\"",
+}
+```
+
+This is the recommended shape when lattice runs beside clawback or other
+project-local hooks and only selected built-ins should be disabled.
 
 ### `node --check` fails on a hook file
 
