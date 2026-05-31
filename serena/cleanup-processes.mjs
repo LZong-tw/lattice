@@ -106,6 +106,9 @@ public static class ProcInfo {
 }
 "@
 
+$cmdLines = @{}
+foreach ($wp in Get-CimInstance Win32_Process) { $cmdLines[[int]$wp.ProcessId] = $wp.CommandLine }
+
 Get-Process | ForEach-Object {
   $p = $_
   [PSCustomObject]@{
@@ -113,6 +116,7 @@ Get-Process | ForEach-Object {
     parentId = [ProcInfo]::GetParentPid($p)
     name = $p.ProcessName
     path = $p.Path
+    commandLine = $cmdLines[[int]$p.Id]
     startTime = if ($p.StartTime) { $p.StartTime.ToUniversalTime().ToString("o") } else { $null }
     cpuSeconds = $p.CPU
     handleCount = $p.HandleCount
@@ -181,6 +185,23 @@ function isSerenaWrapper(row) {
 
 function isPythonWebView(row) {
   return processName(row) === "msedgewebview2";
+}
+
+// A Serena-owned marker: the executable path or full command line of any
+// process in the tree mentions "serena". Used to avoid treating an
+// unrelated `python + msedgewebview2` app (which shares the same process
+// shape) as a Serena tree just because of that shape.
+function looksLikeSerena(row) {
+  const haystack = `${row.path || ""} ${row.commandLine || ""}`.toLowerCase();
+  return haystack.includes("serena");
+}
+
+function treeHasSerenaMarker(byId, childrenByParent, rootId) {
+  for (const pid of descendantSet(childrenByParent, rootId)) {
+    const row = byId.get(pid);
+    if (row && looksLikeSerena(row)) return true;
+  }
+  return false;
 }
 
 function hoursSince(row, now) {
@@ -460,6 +481,9 @@ export function collectSerenaCleanupTargets(rows, options = cleanupOptionsFromEn
 
     const root = rootForSerenaLikeTree(byId, row);
     if (protectedPids.has(root.id) || targets.has(root.id)) continue;
+    // `python + WebView` alone is not enough — require a Serena marker
+    // somewhere in the tree before treating it as a Serena process tree.
+    if (!treeHasSerenaMarker(byId, childrenByParent, root.id)) continue;
 
     const metrics = treeMetrics(root, byId, childrenByParent, protectedPids, now);
     if (metrics.parentMissing) addTarget(targets, root, "serena-python-tree", metrics, "orphan-serena-python-tree");

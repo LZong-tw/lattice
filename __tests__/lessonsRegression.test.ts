@@ -22,7 +22,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { evaluateWriteGate } from "../lessons/write-gate.mjs";
+import { evaluateWriteGate, extractCommitMessage } from "../lessons/write-gate.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -146,5 +146,50 @@ describe("lessons/write-gate (P2 #2: git commit -a detection)", () => {
       config: baseConfig,
     });
     expect(verdict === null || typeof verdict === "object").toBe(true);
+  });
+});
+
+describe("lessons/write-gate (issue #6 P2 #3: combined short-flag message)", () => {
+  it("extracts the message carried by a combined -am cluster", () => {
+    expect(extractCommitMessage('git commit -am "[no-decision] chore"', repoRoot)).toBe(
+      "[no-decision] chore",
+    );
+  });
+
+  it("extracts the message from other clusters like -im", () => {
+    expect(extractCommitMessage("git commit -im single-word", repoRoot)).toBe("single-word");
+  });
+
+  it("still extracts a plain -m message", () => {
+    expect(extractCommitMessage('git commit -m "plain message"', repoRoot)).toBe("plain message");
+  });
+
+  it("still extracts a --message=value long form", () => {
+    expect(extractCommitMessage('git commit --message="long msg"', repoRoot)).toBe("long msg");
+  });
+
+  it("does NOT treat --amend as carrying a message", () => {
+    expect(extractCommitMessage("git commit --amend", repoRoot)).toBe("");
+  });
+});
+
+describe("lessons/promote-audit (issue #6 P2 #4: import side-effect)", () => {
+  it("does NOT execute run() when imported as a module", async () => {
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    const captured: string[] = [];
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      captured.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      const url =
+        new URL("../lessons/promote-audit.mjs", import.meta.url).href + `?t=${Date.now()}`;
+      await import(url);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    expect(captured.join("")).toBe("");
   });
 });

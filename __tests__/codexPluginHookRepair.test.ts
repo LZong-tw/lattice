@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  defaultCodexHome,
   discoverCodexPluginHookFiles,
   normalizeCodexPluginHookCommand,
   repairCodexPluginHookFile,
@@ -30,6 +31,21 @@ function writeHooksJson(relativePluginRoot: string, hooks: unknown) {
   fs.writeFileSync(hooksFile, JSON.stringify(hooks, null, 2), "utf8");
   return { pluginRoot, hooksFile };
 }
+
+describe("defaultCodexHome", () => {
+  it("uses an explicit CODEX_HOME as-is without appending a second .codex", () => {
+    expect(defaultCodexHome({ CODEX_HOME: "C:\\Users\\LZong\\.codex" })).toBe(
+      "C:\\Users\\LZong\\.codex",
+    );
+  });
+
+  it("appends .codex only on the USERPROFILE/HOME fallback", () => {
+    expect(defaultCodexHome({ USERPROFILE: "C:\\Users\\LZong" })).toBe(
+      path.join("C:\\Users\\LZong", ".codex"),
+    );
+    expect(defaultCodexHome({ HOME: "/home/lzong" })).toBe(path.join("/home/lzong", ".codex"));
+  });
+});
 
 describe("normalizeCodexPluginHookCommand", () => {
   it("replaces CLAUDE_PLUGIN_ROOT placeholders with the concrete plugin root", () => {

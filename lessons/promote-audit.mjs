@@ -34,6 +34,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { loadLessonsConfig } from "./config.mjs";
 import { extractLessons } from "./reorganize-audit.mjs";
@@ -213,4 +214,13 @@ function run() {
   }
 }
 
-run();
+// IMPORTANT: only run as CLI when invoked directly. Tests (and the
+// `scoreLesson` subpath export) import this module — without this guard,
+// the import executes `run()` as a side effect, writing to stdout and,
+// if `--open-issues` is in the parent process argv, attempting issue
+// creation. Mirrors the guard in `reorganize-audit.mjs`.
+const invokedAsScript =
+  process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (invokedAsScript) {
+  run();
+}

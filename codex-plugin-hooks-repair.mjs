@@ -46,7 +46,10 @@ function looksLikeShellHook(scriptPath) {
 }
 
 export function defaultCodexHome(env = process.env) {
-  const home = env.CODEX_HOME || env.USERPROFILE || env.HOME || os.homedir();
+  // CODEX_HOME already points at the `.codex` directory itself — use it
+  // verbatim. Only the home-directory fallbacks need `.codex` appended.
+  if (env.CODEX_HOME) return env.CODEX_HOME;
+  const home = env.USERPROFILE || env.HOME || os.homedir();
   return path.join(home, ".codex");
 }
 

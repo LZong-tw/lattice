@@ -105,13 +105,16 @@ function usesAllFlag(command) {
  * Anything else (interactive `-e`, template, amend without -m) returns
  * "" — the gate falls back to checking the staged diff only.
  */
-function extractCommitMessage(command, repoRoot) {
+export function extractCommitMessage(command, repoRoot) {
   if (typeof command !== "string") return "";
 
-  const quoted = command.match(/-(?:m|-message)(?:=|\s+)(['"])([\s\S]*?)\1/);
+  // Match `--message` or a short cluster ending in `m` (`-m`, `-am`,
+  // `-im`, `-Sam`, …) — the value-carrying `-m` must be the last letter
+  // of a combined short flag, so `-[A-Za-z]*m` captures the cluster.
+  const quoted = command.match(/(?:--message|-[A-Za-z]*m)(?:=|\s+)(['"])([\s\S]*?)\1/);
   if (quoted) return quoted[2];
 
-  const bare = command.match(/-(?:m|-message)(?:=|\s+)(\S+)/);
+  const bare = command.match(/(?:--message|-[A-Za-z]*m)(?:=|\s+)(\S+)/);
   if (bare) return bare[1];
 
   const fileMatch = command.match(/-(?:F|-file)(?:=|\s+)(\S+)/);

@@ -144,7 +144,7 @@ describe("collectSerenaCleanupTargets", () => {
     ]);
   });
 
-  it("targets old idle python trees that own WebView children", () => {
+  it("targets old idle python trees that own WebView children when a Serena marker is present", () => {
     const targets = collectSerenaCleanupTargets(
       [
         { id: 10, parentId: 1, name: "pwsh", startTime: hoursAgo(10) },
@@ -152,6 +152,7 @@ describe("collectSerenaCleanupTargets", () => {
           id: 20,
           parentId: 10,
           name: "python",
+          commandLine: "C:\\u\\.cache\\uv\\serena\\python.exe -m serena.mcp.server",
           startTime: hoursAgo(5),
           cpuDeltaSeconds: 0,
           privateBytes: mb(900),
@@ -178,5 +179,37 @@ describe("collectSerenaCleanupTargets", () => {
       }),
     ]);
     expect(targets[0].reason).toContain("idle-leak-serena-python-tree");
+  });
+
+  it("leaves an unrelated python+WebView app alone when nothing in the tree marks it as Serena", () => {
+    const targets = collectSerenaCleanupTargets(
+      [
+        { id: 10, parentId: 1, name: "explorer", startTime: hoursAgo(10) },
+        {
+          id: 20,
+          parentId: 10,
+          name: "python",
+          path: "C:\\Apps\\SomeGuiApp\\python.exe",
+          commandLine: "C:\\Apps\\SomeGuiApp\\python.exe app.py",
+          startTime: hoursAgo(5),
+          cpuDeltaSeconds: 0,
+          privateBytes: mb(900),
+          workingSet: mb(60),
+        },
+        {
+          id: 21,
+          parentId: 20,
+          name: "msedgewebview2",
+          startTime: hoursAgo(5),
+          cpuDeltaSeconds: 0,
+          privateBytes: mb(200),
+          workingSet: mb(30),
+        },
+      ],
+      cleanupOptionsFromEnv({ SERENA_CLEANUP_CPU_SAMPLE_MS: "0" }),
+      42,
+    );
+
+    expect(targets).toEqual([]);
   });
 });
