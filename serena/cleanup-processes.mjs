@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { isMainModule } from "../is-main.mjs";
 
 const DEFAULTS = Object.freeze({
   cpuSampleMs: 1200,
@@ -559,7 +559,7 @@ async function main() {
   cleanupSerenaProcesses({ dryRun: process.argv.includes("--dry-run") });
 }
 
-const isCli = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+const isCli = isMainModule(import.meta.url);
 if (isCli) {
   main().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);

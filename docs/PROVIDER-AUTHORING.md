@@ -239,6 +239,27 @@ supportedClients: Object.freeze(["claude-code"]),  // skipped silently on copilo
 
 ---
 
+## CLI entry points
+
+If a provider module doubles as a CLI script (a `main()` that runs when invoked
+directly), detect direct invocation with the shared `isMainModule()` helper —
+**not** a raw `process.argv[1] === fileURLToPath(import.meta.url)` compare:
+
+```javascript
+import { isMainModule } from "../is-main.mjs";
+
+if (isMainModule(import.meta.url)) {
+  main();
+}
+```
+
+`isMainModule()` canonicalises both paths with `realpathSync` first, so the
+guard still fires when the package is reached through a symlink/junction (pnpm,
+`npm link`). The raw compare silently no-ops in that case because `argv[1]`
+keeps the link path while `import.meta.url` resolves to the real path.
+
+---
+
 ## Testing
 
 `@lzong.tw/lattice/testing` ships three helpers:

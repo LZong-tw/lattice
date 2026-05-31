@@ -3,7 +3,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isMainModule } from "./is-main.mjs";
 import { spawnSync } from "node:child_process";
 
 import {
@@ -13,7 +13,6 @@ import {
   repoRoot as defaultRepoRoot,
 } from "./common.mjs";
 
-const scriptPath = fileURLToPath(import.meta.url);
 const CHECKPOINT_COOLDOWN_MS = 15 * 60 * 1000;
 
 function getStateRoot(stateHome = process.env.XDG_STATE_HOME, repoPath = defaultRepoRoot) {
@@ -166,7 +165,7 @@ export function maybePrintCommitCheckpointReminder(options = {}) {
   return true;
 }
 
-if (process.argv[1] === scriptPath) {
+if (isMainModule(import.meta.url)) {
   await readJsonStdin();
   maybePrintCommitCheckpointReminder();
 }

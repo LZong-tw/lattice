@@ -10,6 +10,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isMainModule } from "./is-main.mjs";
 
 import {
   formatCodexPluginHookRepairReport,
@@ -996,7 +997,7 @@ async function main() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMainModule(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`lattice: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);

@@ -34,7 +34,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isMainModule } from "../is-main.mjs";
 
 import { loadLessonsConfig } from "./config.mjs";
 import { extractLessons } from "./reorganize-audit.mjs";
@@ -219,8 +219,7 @@ function run() {
 // the import executes `run()` as a side effect, writing to stdout and,
 // if `--open-issues` is in the parent process argv, attempting issue
 // creation. Mirrors the guard in `reorganize-audit.mjs`.
-const invokedAsScript =
-  process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+const invokedAsScript = isMainModule(import.meta.url);
 if (invokedAsScript) {
   run();
 }

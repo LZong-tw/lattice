@@ -24,7 +24,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isMainModule } from "../is-main.mjs";
 
 import { loadLessonsConfig } from "./config.mjs";
 
@@ -161,8 +161,7 @@ function run() {
 // imports `extractLessons` from this module — without this guard, the
 // import would execute `run()` as a side effect and corrupt the
 // importer's stdout. The same pattern protects `size-check.mjs`.
-const invokedAsScript =
-  process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+const invokedAsScript = isMainModule(import.meta.url);
 if (invokedAsScript) {
   run();
 }

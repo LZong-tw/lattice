@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isMainModule } from "./is-main.mjs";
 
 export const allowedHookTargets = new Set([
   "session-start.mjs",
@@ -142,6 +143,6 @@ if (Array.isArray(globalThis.__latticeHookArgs)) {
       ? globalThis.__latticeHookStdin
       : undefined,
   });
-} else if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+} else if (isMainModule(import.meta.url)) {
   await main();
 }

@@ -16,7 +16,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isMainModule } from "../is-main.mjs";
 
 import { loadLessonsConfig } from "./config.mjs";
 
@@ -77,8 +77,7 @@ function main() {
 }
 
 // Run only when invoked as CLI (matches both Windows and POSIX paths).
-const invokedAsScript =
-  process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+const invokedAsScript = isMainModule(import.meta.url);
 if (invokedAsScript) {
   try {
     main();

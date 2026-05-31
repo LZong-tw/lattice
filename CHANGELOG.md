@@ -5,6 +5,21 @@ All notable changes to `@lzong.tw/lattice` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- CLI entry-point guards are now symlink-safe. The
+  `process.argv[1] === fileURLToPath(import.meta.url)` check (and its
+  `resolve()`-wrapped variant) silently became a no-op under symlinked installs
+  (pnpm, `npm link`), where `argv[1]` keeps the link path while
+  `import.meta.url` resolves to the real path — so a script's `run()`/`main()`
+  never fired. Extracted the comparison into a shared, injectable,
+  `realpathSync`-based `isMainModule()` (`is-main.mjs`) and routed all seven
+  affected guards through it (`commit-checkpoint`, `hook-runner`, `init`,
+  `lessons/{promote-audit,reorganize-audit,size-check}`,
+  `serena/cleanup-processes`). Added `__tests__/isMain.test.ts`.
+
 ## [0.2.7] — 2026-05-29
 
 ### Added
