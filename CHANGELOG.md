@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] — 2026-05-31
+
 ### Fixed
 
 - CLI entry-point guards are now symlink-safe. The
@@ -19,6 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   affected guards through it (`commit-checkpoint`, `hook-runner`, `init`,
   `lessons/{promote-audit,reorganize-audit,size-check}`,
   `serena/cleanup-processes`). Added `__tests__/isMain.test.ts`.
+- Serena process cleanup no longer kills unrelated `python`/`uv`/`uvx` +
+  `msedgewebview2` process trees that merely share Serena's process shape. A
+  tree must now carry a Serena-owned marker (its executable path or command
+  line mentions `serena`) before it is targeted; the Windows probe now reports
+  each process's command line.
+- `lattice repair codex-plugin-hooks` no longer doubles the `.codex` path
+  segment when `CODEX_HOME` already points at a `.codex` directory. The segment
+  is only appended on the `USERPROFILE`/`HOME` fallback.
+- The lessons write-gate now recovers the commit message from combined short
+  flags (`-am`, `-im`, …), so the `[no-decision]` bypass token passed via
+  `git commit -am "..."` is honoured instead of wrongly blocked.
+- `lessons/promote-audit.mjs` no longer runs its CLI body on import, so
+  importing `scoreLesson` is free of stdout output and accidental issue
+  creation.
 
 ## [0.2.7] — 2026-05-29
 
