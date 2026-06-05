@@ -9,7 +9,7 @@ policy gates, lifecycle reminders, and provider integrations for
 **Claude Code**, **GitHub Copilot CLI**, and **Codex CLI**.
 
 This is the **public OSS core**. It contains the v1 dispatcher contract, the
-built-in providers (`builtins/`, `serena/`, `semble/`, `rtk/`), and the
+built-in providers (`builtins/`, `serena/`, `mcp/`, `semble/`, `rtk/`), and the
 install planner (`init.mjs`). Organization-specific providers live out of
 tree and are loaded at runtime via `LATTICE_EXTRA_PROVIDERS` — keep this
 repo focused on the shared runtime and ship private logic as separate
@@ -344,6 +344,7 @@ START
 | Serena provider | `serena/` | Serena-specific lifecycle, launcher, dashboard helpers, and v1 provider definition. |
 | Serena cleanup | `serena/cleanup-processes.mjs` | SessionStart stale-process cleanup for orphaned or idle Serena/WebView process trees. |
 | Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena MCP through a stable loopback HTTP singleton. Legacy stdio configs still validate during migration. |
+| MCP cleanup | `mcp/cleanup-processes.mjs` | SessionStart stale-process cleanup for old idle Semble MCP and Playwright MCP helper process trees. |
 | Semble provider | `semble/provider.mjs` | Semble v1 provider definition. |
 | Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP. |
 | RTK provider | `rtk/provider.mjs` | Optional PreToolUse command rewrite through `rtk rewrite` for token-compacted shell output. |
@@ -368,6 +369,7 @@ Inside this repo, scripts live at the package root:
 - `serena/bootstrap.mjs`
 - `serena/cleanup-processes.mjs`
 - `serena/mcp-config-guard.mjs`
+- `mcp/cleanup-processes.mjs`
 - `semble/mcp-config-guard.mjs`
 - `rtk/provider.mjs`
 
@@ -930,6 +932,7 @@ Defaults (overridable via `LATTICE_TIMEOUT_<EVENT_IN_SCREAMING_SNAKE>=ms`):
 | `lattice/edit-reminder` | PostToolUse | Remind to log lessons after edits. |
 | `lattice/stop-checklist` | Stop | Print the end-of-turn checklist; optionally gate with verification (`LATTICE_VERIFY_ON_STOP=1`). |
 | `serena` | SessionStart, validator | Clean up stale Serena/WebView process trees, bootstrap [Serena](https://github.com/oraios/serena) MCP server, and validate `.mcp.json` / `.codex/config.toml` stable loopback HTTP config when `LATTICE_REQUIRE_SERENA_MCP=1`. Legacy stdio configs still validate during migration. |
+| `lattice/mcp-cleanup` | SessionStart | Fail-open cleanup for old idle Semble MCP and Playwright MCP helper trees. Disable with `LATTICE_MCP_CLEANUP=0`; dry-run with `LATTICE_MCP_CLEANUP_DRY_RUN=1`; tune with `LATTICE_MCP_CLEANUP_SEMBLE_GRACE_HOURS` and `LATTICE_MCP_CLEANUP_PLAYWRIGHT_GRACE_HOURS`. |
 | `semble` | validator only | Validate Semble MCP config when `LATTICE_REQUIRE_SEMBLE_MCP=1`. Skipped for Copilot. |
 | `rtk` | PreToolUse, validator | Optionally rewrite Claude/Codex Bash commands via `rtk rewrite`; validate the binary only when `LATTICE_REQUIRE_RTK=1`. Skipped for Copilot. |
 | `lattice/lessons` | Stop, PostToolUse, PreToolUse | Manage the growing-prose-rules problem in long-lived repos. Stop hook warns when `CLAUDE.md` exceeds a soft cap; PostToolUse Edit/Write resurfaces the per-domain doc when a touched file matches a configured domain; opt-in PreToolUse write-gate blocks `git commit` for code changes that don't also edit a docs path. Full guide: [`docs/LESSONS.md`](docs/LESSONS.md). Zero-config behaviour fires only the size-check warning. |

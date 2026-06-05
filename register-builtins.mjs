@@ -33,6 +33,7 @@ import {
 } from "./builtins/reminders-provider.mjs";
 import { serenaProvider } from "./serena/provider.mjs";
 import { sembleProvider } from "./semble/provider.mjs";
+import { mcpCleanupProvider } from "./mcp/provider.mjs";
 import { rtkProvider } from "./rtk/provider.mjs";
 import { lessonsProvider } from "./lessons/provider.mjs";
 
@@ -42,6 +43,7 @@ registerProvider(screenshotReminderProvider);
 registerProvider(editReminderProvider);
 registerProvider(stopChecklistProvider);
 registerProvider(serenaProvider);
+registerProvider(mcpCleanupProvider);
 registerProvider(sembleProvider);
 registerProvider(rtkProvider);
 registerProvider(lessonsProvider);

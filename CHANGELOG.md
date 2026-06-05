@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `lattice/mcp-cleanup`, a SessionStart fail-open cleanup provider for
+  stale Semble MCP and Playwright MCP helper process trees. It targets old,
+  idle helpers that retain high private commit or survive under detached
+  Claude/Codex parents, while preserving young Playwright MCP trees by default.
+  Operators can disable it with `LATTICE_MCP_CLEANUP=0`, dry-run with
+  `LATTICE_MCP_CLEANUP_DRY_RUN=1`, and tune grace windows with
+  `LATTICE_MCP_CLEANUP_SEMBLE_GRACE_HOURS` /
+  `LATTICE_MCP_CLEANUP_PLAYWRIGHT_GRACE_HOURS`.
+
 ## [0.2.8] — 2026-05-31
 
 ### Fixed

@@ -81,6 +81,38 @@ entries for selected clients:
 node hooks/init.mjs --write --clients claude,codex --providers semble
 ```
 
+### Stale Semble / Playwright MCP cleanup
+
+Lattice also registers `lattice/mcp-cleanup` on Claude Code and Codex
+`SessionStart`. It is fail-open and targets old idle helper trees from:
+
+- `uvx --from semble[mcp] semble`
+- `npx @playwright/mcp@latest`
+
+This prevents long-lived terminals from accumulating many Python/Node MCP
+helpers that retain private commit after the owning agent session is stale.
+Young Playwright MCP trees are preserved by default.
+
+Controls:
+
+```bash
+# Disable cleanup completely
+LATTICE_MCP_CLEANUP=0
+
+# Log what would be stopped without killing
+LATTICE_MCP_CLEANUP_DRY_RUN=1
+
+# Tune age windows in hours
+LATTICE_MCP_CLEANUP_SEMBLE_GRACE_HOURS=1
+LATTICE_MCP_CLEANUP_PLAYWRIGHT_GRACE_HOURS=4
+```
+
+Manual dry-run from a mounted `hooks/` directory:
+
+```bash
+node hooks/mcp/cleanup-processes.mjs --dry-run
+```
+
 ---
 
 ## RTK Command Rewrite
