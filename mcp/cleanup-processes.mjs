@@ -12,6 +12,8 @@ const DEFAULTS = Object.freeze({
   lowWorkingSetRatio: 0.18,
   idleCpuSeconds: 0.2,
   killScore: 70,
+  runawayClaudeSearchGraceMinutes: 15,
+  runawayClaudeSearchMinCpuSeconds: 0.3,
 });
 
 const ACTIVE_PARENT_NAMES = new Set([
@@ -78,6 +80,16 @@ export function cleanupOptionsFromEnv(env = process.env) {
       "LATTICE_MCP_CLEANUP_SEMBLE_GRACE_HOURS",
       DEFAULTS.sembleGraceHours,
     ),
+    runawayClaudeSearchGraceMinutes: numberEnv(
+      env,
+      "LATTICE_MCP_CLEANUP_RUNAWAY_CLAUDE_SEARCH_GRACE_MINUTES",
+      DEFAULTS.runawayClaudeSearchGraceMinutes,
+    ),
+    runawayClaudeSearchMinCpuSeconds: numberEnv(
+      env,
+      "LATTICE_MCP_CLEANUP_RUNAWAY_CLAUDE_SEARCH_MIN_CPU_SECONDS",
+      DEFAULTS.runawayClaudeSearchMinCpuSeconds,
+    ),
   };
 }
 
@@ -108,6 +120,22 @@ function isSembleMarker(row) {
 function isPlaywrightMarker(row) {
   const cmd = commandLineLower(row).replaceAll("\\", "/");
   return cmd.includes("@playwright/mcp") || cmd.includes("@playwright/mcp/cli.js");
+}
+
+function isClaudeProcess(row) {
+  return processName(row).startsWith("claude");
+}
+
+function isRunawayClaudeSearch(row) {
+  if (!["pwsh", "powershell"].includes(processName(row))) return false;
+  const cmd = commandLineLower(row);
+  return (
+    cmd.includes("get-childitem") &&
+    cmd.includes("-recurse") &&
+    cmd.includes("select-string") &&
+    cmd.includes(".claude") &&
+    !cmd.includes("-exclude")
+  );
 }
 
 function buildIndex(rows) {
@@ -168,6 +196,17 @@ function hoursSince(row, now) {
   const started = Date.parse(row.startTime);
   if (!Number.isFinite(started)) return 0;
   return Math.max(0, (now - started) / 36e5);
+}
+
+function hasNewerSibling(byId, childrenByParent, row) {
+  const started = Date.parse(row.startTime);
+  if (!Number.isFinite(started)) return false;
+  return (childrenByParent.get(row.parentId) || []).some((pid) => {
+    if (pid === row.id) return false;
+    const sibling = byId.get(pid);
+    const siblingStarted = Date.parse(sibling?.startTime);
+    return Number.isFinite(siblingStarted) && siblingStarted > started;
+  });
 }
 
 function rootForMcpTree(byId, row) {
@@ -299,6 +338,28 @@ export function collectMcpCleanupTargets(rows, options = cleanupOptionsFromEnv()
   const { byId, childrenByParent } = buildIndex(rows);
   const protectedPids = ancestorSet(byId, ownPid);
   const targets = new Map();
+
+  for (const row of byId.values()) {
+    if (!isRunawayClaudeSearch(row) || protectedPids.has(row.id)) continue;
+    const parent = byId.get(row.parentId);
+    const metrics = treeMetrics(row, byId, childrenByParent, protectedPids, now);
+    if (
+      !isClaudeProcess(parent) ||
+      metrics.ageHours * 60 < options.runawayClaudeSearchGraceMinutes ||
+      metrics.cpuDeltaSeconds === null ||
+      metrics.cpuDeltaSeconds < options.runawayClaudeSearchMinCpuSeconds ||
+      !hasNewerSibling(byId, childrenByParent, row)
+    ) {
+      continue;
+    }
+    addTarget(
+      targets,
+      row,
+      "runaway-claude-search-tree",
+      metrics,
+      "superseded-active-claude-recursive-search",
+    );
+  }
 
   for (const row of byId.values()) {
     const kind = isSembleMarker(row)

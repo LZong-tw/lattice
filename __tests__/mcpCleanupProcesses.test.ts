@@ -14,6 +14,7 @@ describe("cleanupOptionsFromEnv", () => {
       LATTICE_MCP_CLEANUP_CPU_SAMPLE_MS: "0",
       LATTICE_MCP_CLEANUP_HIGH_PRIVATE_MB: "768",
       LATTICE_MCP_CLEANUP_PLAYWRIGHT_GRACE_HOURS: "8",
+      LATTICE_MCP_CLEANUP_RUNAWAY_CLAUDE_SEARCH_GRACE_MINUTES: "20",
       LATTICE_MCP_CLEANUP_SEMBLE_GRACE_HOURS: "2",
     });
 
@@ -21,6 +22,7 @@ describe("cleanupOptionsFromEnv", () => {
       cpuSampleMs: 0,
       highPrivateMb: 768,
       playwrightGraceHours: 8,
+      runawayClaudeSearchGraceMinutes: 20,
       sembleGraceHours: 2,
     });
   });
@@ -167,6 +169,68 @@ describe("collectMcpCleanupTargets", () => {
           cpuDeltaSeconds: 8,
           privateBytes: mb(180),
           workingSet: mb(2),
+        },
+      ],
+      cleanupOptionsFromEnv({ LATTICE_MCP_CLEANUP_CPU_SAMPLE_MS: "0" }),
+      42,
+    );
+
+    expect(targets).toEqual([]);
+  });
+
+  it("targets active recursive Claude searches superseded by a newer child task", () => {
+    const targets = collectMcpCleanupTargets(
+      [
+        { id: 10, parentId: 1, name: "claude.exe.old.1", startTime: hoursAgo(6) },
+        {
+          id: 11,
+          parentId: 10,
+          name: "pwsh",
+          commandLine:
+            "Get-ChildItem -Recurse -File -Path scripts,.claude -Include *.mjs,*.js | Select-String -Pattern gate",
+          startTime: hoursAgo(2),
+          cpuDeltaSeconds: 0.8,
+          privateBytes: mb(90),
+          workingSet: mb(70),
+        },
+        {
+          id: 12,
+          parentId: 10,
+          name: "pwsh",
+          commandLine: "codex exec --dangerously-bypass-approvals-and-sandbox",
+          startTime: hoursAgo(0.1),
+          cpuDeltaSeconds: 0,
+          privateBytes: mb(90),
+          workingSet: mb(70),
+        },
+      ],
+      cleanupOptionsFromEnv({ LATTICE_MCP_CLEANUP_CPU_SAMPLE_MS: "0" }),
+      42,
+    );
+
+    expect(targets).toEqual([
+      expect.objectContaining({
+        kind: "runaway-claude-search-tree",
+        pid: 11,
+        reason: "superseded-active-claude-recursive-search",
+      }),
+    ]);
+  });
+
+  it("keeps an active recursive Claude search without a newer sibling task", () => {
+    const targets = collectMcpCleanupTargets(
+      [
+        { id: 10, parentId: 1, name: "claude", startTime: hoursAgo(6) },
+        {
+          id: 11,
+          parentId: 10,
+          name: "pwsh",
+          commandLine:
+            "Get-ChildItem -Recurse -File -Path scripts,.claude -Include *.mjs,*.js | Select-String -Pattern gate",
+          startTime: hoursAgo(2),
+          cpuDeltaSeconds: 0.8,
+          privateBytes: mb(90),
+          workingSet: mb(70),
         },
       ],
       cleanupOptionsFromEnv({ LATTICE_MCP_CLEANUP_CPU_SAMPLE_MS: "0" }),
