@@ -122,6 +122,15 @@ function isPlaywrightMarker(row) {
   return cmd.includes("@playwright/mcp") || cmd.includes("@playwright/mcp/cli.js");
 }
 
+function isCodexMcpMarker(row) {
+  const cmd = commandLineLower(row).replaceAll("\\", "/");
+  return (
+    cmd.includes("./mcp/server.cjs") ||
+    cmd.includes("app-server-broker.mjs") ||
+    (cmd.includes("codex.js") && cmd.includes("app-server"))
+  );
+}
+
 function isClaudeProcess(row) {
   return processName(row).startsWith("claude");
 }
@@ -366,7 +375,9 @@ export function collectMcpCleanupTargets(rows, options = cleanupOptionsFromEnv()
       ? "semble-mcp-tree"
       : isPlaywrightMarker(row)
         ? "playwright-mcp-tree"
-        : "";
+        : isCodexMcpMarker(row)
+          ? "codex-mcp-tree"
+          : "";
     if (!kind || protectedPids.has(row.id)) continue;
 
     const root = rootForMcpTree(byId, row);
