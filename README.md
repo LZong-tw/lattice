@@ -344,9 +344,11 @@ START
 | Serena provider | `serena/` | Serena-specific lifecycle, launcher, dashboard helpers, and v1 provider definition. |
 | Serena cleanup | `serena/cleanup-processes.mjs` | SessionStart stale-process cleanup for orphaned or idle Serena/WebView process trees. |
 | Serena MCP guard | `serena/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Serena MCP through a stable loopback HTTP singleton. Legacy stdio configs still validate during migration. |
+| Serena user singleton | `serena/user-singleton/` | Optional machine-level cwd-lazy HTTP ensure for multi-worktree hosts ([docs/USER-MCP-SINGLETONS.md](docs/USER-MCP-SINGLETONS.md)). |
+| Semble user singleton | `semble/user-singleton/` | Optional machine-wide Semble HTTP singleton (`:9131`) for multi-repo hosts. |
 | MCP cleanup | `mcp/cleanup-processes.mjs` | SessionStart stale-process cleanup for old idle Semble MCP and Playwright MCP helper process trees. |
 | Semble provider | `semble/provider.mjs` | Semble v1 provider definition. |
-| Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require startup-time Semble stdio MCP. |
+| Semble MCP guard | `semble/mcp-config-guard.mjs` | Optional SessionStart guard for repos that require Semble MCP (loopback HTTP singleton preferred; stdio still accepted). |
 | RTK provider | `rtk/provider.mjs` | Optional PreToolUse command rewrite through `rtk rewrite` for token-compacted shell output. |
 | Examples | `examples/` | Reference adapters (e.g. `clawback-adapter/`) showing how external providers map onto the v1 contract. |
 | Tests | `__tests__/` | Package-level runtime and provider contracts. |

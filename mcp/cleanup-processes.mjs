@@ -105,7 +105,20 @@ function commandLineLower(row) {
   return commandLine(row).toLowerCase();
 }
 
+function isManagedSembleSingleton(row) {
+  // User-level HTTP singleton (semble/user-singleton/) must not be culled.
+  const cmd = commandLineLower(row).replaceAll("\\", "/");
+  return (
+    cmd.includes("start-gateway.cmd") ||
+    cmd.includes("run-semble-stdio") ||
+    cmd.includes("semble-http-singleton") ||
+    cmd.includes("/.semble/http-singleton/") ||
+    (cmd.includes("supergateway") && (cmd.includes(":9131") || cmd.includes("port 9131") || cmd.includes("--port 9131")))
+  );
+}
+
 function isSembleMarker(row) {
+  if (isManagedSembleSingleton(row)) return false;
   const cmd = commandLineLower(row);
   const path = String(row.path || "").toLowerCase();
   return (

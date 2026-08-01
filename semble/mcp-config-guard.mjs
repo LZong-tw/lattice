@@ -44,6 +44,44 @@ function validateProjectWrapperEntry(args, root, label) {
   return failures;
 }
 
+function isLoopbackHost(hostname) {
+  return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
+}
+
+/**
+ * Preferred setup: machine-wide HTTP singleton (see semble/user-singleton/).
+ */
+function validateSembleHttpEntry(entry, label) {
+  const failures = [];
+
+  if (entry.type && entry.type !== "http") {
+    failures.push(`${label} HTTP entry type must be "http" when type is set.`);
+  }
+
+  if (typeof entry.url !== "string" || entry.url.trim() === "") {
+    failures.push(`${label} must define url for the Semble HTTP singleton.`);
+    return failures;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(entry.url);
+  } catch {
+    failures.push(`${label} url must be a valid URL.`);
+    return failures;
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol) || !isLoopbackHost(parsed.hostname)) {
+    failures.push(`${label} must point at a loopback HTTP endpoint.`);
+  }
+
+  if (!parsed.pathname.endsWith("/mcp")) {
+    failures.push(`${label} url must point at a /mcp endpoint.`);
+  }
+
+  return failures;
+}
+
 function validateSembleStdioEntry(entry, root, label) {
   const failures = [];
 
@@ -51,8 +89,9 @@ function validateSembleStdioEntry(entry, root, label) {
     return [`${label} must define mcp_servers/mcpServers.semble.`];
   }
 
+  // Preferred: user-level HTTP singleton (docs/USER-MCP-SINGLETONS.md).
   if (hasOwn(entry, "url")) {
-    failures.push(`${label} must use stdio command/args, not url.`);
+    return validateSembleHttpEntry(entry, label);
   }
 
   const args = Array.isArray(entry.args) ? entry.args : [];
@@ -66,7 +105,9 @@ function validateSembleStdioEntry(entry, root, label) {
   } else if (isNodeCommand(entry.command)) {
     failures.push(...validateProjectWrapperEntry(args, root, label));
   } else {
-    failures.push(`${label} must launch Semble with uvx directly or node scripts/semble-mcp.mjs.`);
+    failures.push(
+      `${label} must use a loopback HTTP url, uvx --from semble[mcp], or node scripts/semble-mcp.mjs.`,
+    );
   }
 
   return failures;

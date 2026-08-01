@@ -3,9 +3,10 @@
  * semble/provider.mjs — v1-contract Semble provider.
  *
  * Validator-only: Semble has no per-event work to do beyond enforcing that
- * the client's MCP config points at the Semble stdio server. The guard
- * itself lives in ./mcp-config-guard.mjs and is invoked lazily so the
- * provider module stays cheap to import.
+ * the client's MCP config points at a Semble server (loopback HTTP singleton
+ * preferred; legacy stdio still accepted). The guard itself lives in
+ * ./mcp-config-guard.mjs and is invoked lazily so the provider module stays
+ * cheap to import.
  *
  * `supportedClients` encodes Semble's deliberate exclusion of Copilot —
  * the underlying guard accepts bare `claude` / `codex` only. The

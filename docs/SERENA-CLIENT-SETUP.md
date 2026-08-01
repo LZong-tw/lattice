@@ -97,13 +97,17 @@ the launcher exits 0 without starting a second instance.
 The process is **detached**, uses hidden Windows process launch settings, and
 writes state files to the runtime directory.
 
-If Claude Code/Codex already use a project-wide Serena HTTP singleton such as
-`http://127.0.0.1:9127/mcp`, disable this Lattice provider with
+If Claude Code/Codex already use a project-wide or **user-level** Serena HTTP
+singleton such as `http://127.0.0.1:9127/mcp`, disable this Lattice provider with
 `LATTICE_DISABLE=serena`. That keeps the repo hooks active but prevents the
 older per-client sidecar on ports 9122/9123 from launching in parallel.
 On Windows hook configs, write that opt-out through
 `hook-runner.mjs --env LATTICE_DISABLE=serena` instead of a POSIX
 `LATTICE_DISABLE=serena node ...` prefix.
+
+For multi-worktree machines (cwd-lazy ensure, port pins, worktree→main policy),
+see **[USER-MCP-SINGLETONS.md](./USER-MCP-SINGLETONS.md)** and
+`serena/user-singleton/`.
 
 ### Stale Process Cleanup
 

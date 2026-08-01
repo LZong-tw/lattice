@@ -552,7 +552,7 @@ describe("Semble MCP startup guard", () => {
     });
   });
 
-  it("rejects Claude HTTP Semble config because tools may attach too late", () => {
+  it("accepts Claude loopback HTTP Semble singleton config", () => {
     const root = createTempRoot();
     writeFileSync(
       join(root, ".mcp.json"),
@@ -560,7 +560,28 @@ describe("Semble MCP startup guard", () => {
         mcpServers: {
           semble: {
             type: "http",
-            url: "http://127.0.0.1:9124/mcp",
+            url: "http://127.0.0.1:9131/mcp",
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    expect(validateRequiredSembleMcpConfig("claude", { root })).toEqual({
+      ok: true,
+      failures: [],
+    });
+  });
+
+  it("rejects non-loopback HTTP Semble config", () => {
+    const root = createTempRoot();
+    writeFileSync(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          semble: {
+            type: "http",
+            url: "http://example.com/mcp",
           },
         },
       }),
@@ -569,7 +590,7 @@ describe("Semble MCP startup guard", () => {
 
     const result = validateRequiredSembleMcpConfig("claude", { root });
     expect(result.ok).toBe(false);
-    expect(result.failures.join("\n")).toContain("must use stdio command/args");
+    expect(result.failures.join("\n")).toContain("loopback");
   });
 
   it("accepts Codex stdio Semble config", () => {

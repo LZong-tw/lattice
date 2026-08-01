@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- User-level MCP singleton recipes for multi-worktree machines:
+  - `serena/user-singleton/` — cwd-lazy project resolve + HTTP ensure helpers
+  - `semble/user-singleton/` — machine-wide Semble HTTP singleton (supergateway)
+  - `scripts/install-user-singletons.mjs` — copy scripts into `~/.serena` / `~/.semble`
+  - `docs/USER-MCP-SINGLETONS.md` — install, ports, worktree policy, monorepo notes
+- `semble/mcp-config-guard.mjs` now accepts loopback HTTP `/mcp` URLs (preferred
+  singleton shape) in addition to legacy stdio `uvx` / project wrapper entries.
+- `mcp/cleanup-processes.mjs` skips managed Semble user-singleton process trees
+  so SessionStart cleanup does not kill the shared HTTP server.
+
+### Changed
+
+- Documented HTTP singleton as the preferred Semble attachment in
+  `docs/OPTIONAL-PROVIDER-SETUP.md`; stdio remains supported for simple setups.
+- Cross-linked user-singleton docs from `docs/SERENA-CLIENT-SETUP.md`.
+
 ## [0.2.9] — 2026-06-05
 
 ### Added

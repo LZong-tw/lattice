@@ -14,9 +14,15 @@ matching smoke tests pass.
 Semble provides code-search MCP tools. It supports Claude Code and Codex. It is
 not used for GitHub Copilot CLI.
 
-### Claude Code
+**Preferred on multi-repo machines:** a **user-level HTTP singleton**
+(`http://127.0.0.1:9131/mcp`). See [USER-MCP-SINGLETONS.md](./USER-MCP-SINGLETONS.md)
+and `semble/user-singleton/`. `LATTICE_REQUIRE_SEMBLE_MCP=1` accepts that loopback
+HTTP shape.
 
-Add or merge this into the repo-scoped `.mcp.json`:
+### Claude Code (legacy per-session stdio)
+
+Add or merge this into the repo-scoped `.mcp.json` only if you are **not** using
+the user-level HTTP singleton:
 
 ```jsonc
 {
@@ -25,6 +31,19 @@ Add or merge this into the repo-scoped `.mcp.json`:
       "type": "stdio",
       "command": "uvx",
       "args": ["--from", "semble[mcp]", "semble"]
+    }
+  }
+}
+```
+
+### Claude Code (HTTP singleton)
+
+```jsonc
+{
+  "mcpServers": {
+    "semble": {
+      "type": "http",
+      "url": "http://127.0.0.1:9131/mcp"
     }
   }
 }
@@ -46,14 +65,22 @@ On Windows, use the portable runner instead of POSIX env-prefix syntax:
 '{}' | node hooks/hook-runner.mjs session-start.mjs claude-code --env LATTICE_REQUIRE_SEMBLE_MCP=1
 ```
 
-### Codex CLI
+### Codex CLI (legacy per-session stdio)
 
-Add or merge this into `.codex/config.toml`:
+Add or merge this into `.codex/config.toml` only if you are **not** using the
+user-level HTTP singleton:
 
 ```toml
 [mcp_servers.semble]
 command = "uvx"
 args = ["--from", "semble[mcp]", "semble"]
+```
+
+### Codex CLI (HTTP singleton)
+
+```toml
+[mcp_servers.semble]
+url = "http://127.0.0.1:9131/mcp"
 ```
 
 Smoke test:
