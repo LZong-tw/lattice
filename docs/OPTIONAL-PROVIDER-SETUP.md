@@ -120,6 +120,16 @@ This prevents long-lived terminals from accumulating many Python/Node MCP
 helpers that retain private commit after the owning agent session is stale.
 Young Playwright MCP trees are preserved by default.
 
+Optional **hourly** Windows scheduled task (independent of agent sessions),
+installed elevated with no console flash via a dedicated `wscript` `.vbs`
+launcher (`WScript.Shell.Run` style 0):
+
+```powershell
+# elevated shell
+pwsh -File scripts/install-mcp-cleanup-scheduled-task.ps1
+# pwsh -File scripts/install-mcp-cleanup-scheduled-task.ps1 -Uninstall
+```
+
 Controls:
 
 ```bash
