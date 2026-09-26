@@ -198,7 +198,7 @@ node hooks/verification/smoke-plan.mjs pre-tool-deny codex
 Each command exits 0 on success and prints a non-zero exit with the failing
 assertion if a hook misfires.
 
-For Copilot-only repos, run the same checks with `copilot-cli`.
+For Copilot-only repos, run the same checks with `copilot`.
 
 ### One-Screen Done Check
 
@@ -229,7 +229,7 @@ Optional provider done checks:
 
 ```
 node -e "require('node:http').get('http://127.0.0.1:9121/mcp',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"  # if Serena is required (substitute your port)
-node -e "const c=require('node:fs').readFileSync('.mcp.json','utf8')+require('node:fs').readFileSync('.codex/config.toml','utf8');process.exit(/\bsemble\b/.test(c)?0:1)"  # if Semble is required
+node -e "const fs=require('node:fs');const c=['.mcp.json','.codex/config.toml'].filter(f=>fs.existsSync(f)).map(f=>fs.readFileSync(f,'utf8')).join('');process.exit(/\bsemble\b/.test(c)?0:1)"  # if Semble is required
 rtk --version  # if LATTICE_REQUIRE_RTK=1
 ```
 
@@ -541,8 +541,8 @@ environment actually uses; there is no single repo-scoped Copilot MCP file that
 **Smoke test:**
 
 ```
-node hooks/verification/smoke-plan.mjs session-start copilot-cli
-node hooks/verification/smoke-plan.mjs pre-tool-deny copilot-cli
+node hooks/verification/smoke-plan.mjs session-start copilot
+node hooks/verification/smoke-plan.mjs pre-tool-deny copilot
 ```
 
 ---
@@ -803,7 +803,7 @@ An LLM agent can consider consumer setup **complete** when ALL of these pass:
 
 1. `node --check hooks/common.mjs && node --check hooks/session-start.mjs && node --check hooks/hook-runner.mjs && node --check hooks/codex-hook-runner.mjs && node --check hooks/pre-tool-policy.mjs` → exits 0
 2. The client config file exists at the correct path (see per-client sections above)
-3. `node hooks/verification/smoke-plan.mjs session-start <client>` → exits 0 for each wired client (`claude-code`, `codex`, `copilot-cli`)
+3. `node hooks/verification/smoke-plan.mjs session-start <client>` → exits 0 for each wired client (`claude-code`, `codex`, `copilot`)
 4. `node hooks/verification/smoke-plan.mjs pre-tool-deny <client>` → exits 0 (the commit gate fires)
 5. (If Serena) the configured `http://127.0.0.1:<port>/mcp` endpoint responds (see SERENA-CLIENT-SETUP.md)
 6. (If Semble) Claude/Codex MCP config contains a stdio `semble` entry

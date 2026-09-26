@@ -9,6 +9,7 @@ import {
   extractDashboardUrl,
   getDashboardPlatformStrategy,
   getRuntimeRoot,
+  normalizeSerenaClient,
   openExternalUrl,
   pickMostRecentActiveClient,
   readDashboardUrlFile,
@@ -36,6 +37,16 @@ afterEach(() => {
 });
 
 describe("Serena dashboard state helpers", () => {
+  it("maps the canonical copilot-cli client id to the copilot sidecar", () => {
+    // client-enum canonicalizes copilot -> copilot-cli, so bootstrap receives
+    // "copilot-cli"; returning null here made session-start skip start-http.
+    expect(normalizeSerenaClient("copilot-cli")).toBe("copilot");
+    expect(normalizeSerenaClient("github-copilot-cli")).toBe("copilot");
+    expect(normalizeSerenaClient("ide")).toBe("copilot");
+    expect(normalizeSerenaClient("copilot")).toBe("copilot");
+    expect(normalizeSerenaClient("unknown-client")).toBeNull();
+  });
+
   it("extracts dashboard URLs from the current Serena log formats", () => {
     const explicitUrlLog = [
       "INFO 2026-04-01 11:12:31,453 [MainThread] serena.agent:__init__:379 - Serena web dashboard started at http://127.0.0.1:24283/dashboard/index.html",

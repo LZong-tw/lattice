@@ -60,7 +60,7 @@ export function normalizeSerenaClient(client) {
   }
 
   const normalized = client.toLowerCase();
-  if (normalized === "ide" || normalized === "github-copilot-cli") {
+  if (normalized === "ide" || normalized === "github-copilot-cli" || normalized === "copilot-cli") {
     return "copilot";
   }
 
