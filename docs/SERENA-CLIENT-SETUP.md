@@ -152,7 +152,7 @@ automatically.
 loopback HTTP singleton:
 
 ```jsonc
-// global ~/.claude.json or the Claude MCP surface your environment uses
+// project .mcp.json — the only file LATTICE_REQUIRE_SERENA_MCP=1 validates
 {
   "mcpServers": {
     "serena": {
@@ -170,7 +170,22 @@ new hidden port.
 Legacy stdio MCP entries remain validator-compatible for older consumers, but
 new setups should prefer the stable HTTP singleton shape above.
 
-**Smoke test:**
+The `LATTICE_REQUIRE_SERENA_MCP=1` check reads only `<repo>/.mcp.json`
+(`mcpServers.serena`). If you attach Serena in the global `~/.claude.json`
+instead, do not combine that with `LATTICE_REQUIRE_SERENA_MCP=1`: the check
+finds no entry in `.mcp.json` and exits 1.
+
+**Smoke test — 9127 singleton path** (the config above, with the Lattice
+provider disabled via `LATTICE_DISABLE=serena`, so no 9122 sidecar starts and
+the provider's MCP-config validator does not run either):
+
+```bash
+curl -sf http://127.0.0.1:9127/mcp -o /dev/null && echo "OK" || echo "FAIL"
+# => OK
+```
+
+**Smoke test — per-client sidecar path** (provider enabled, and the MCP `url`
+above set to `http://127.0.0.1:9122/mcp` instead of 9127):
 
 ```bash
 echo '{}' | node hooks/session-start.mjs claude-code
@@ -182,7 +197,7 @@ curl -sf http://127.0.0.1:9122/mcp -o /dev/null && echo "OK" || echo "FAIL"
 # => OK
 
 printf '{}\n' | env LATTICE_REQUIRE_SERENA_MCP=1 node hooks/session-start.mjs claude-code
-# => exit: 0
+# => exit: 0 (only when the entry is in the project .mcp.json)
 ```
 
 PowerShell equivalent:
@@ -237,7 +252,17 @@ hooks cannot move an already-started client to a new port.
 Legacy stdio MCP entries remain validator-compatible for older consumers, but
 new setups should prefer the stable HTTP singleton shape above.
 
-**Smoke test:**
+**Smoke test — 9127 singleton path** (the config above, with the Lattice
+provider disabled via `LATTICE_DISABLE=serena`, so no 9123 sidecar starts and
+the provider's MCP-config validator does not run either):
+
+```bash
+curl -sf http://127.0.0.1:9127/mcp -o /dev/null && echo "OK" || echo "FAIL"
+# => OK
+```
+
+**Smoke test — per-client sidecar path** (provider enabled, and `url` above set
+to `http://127.0.0.1:9123/mcp` instead of 9127):
 
 ```bash
 echo '{}' | node hooks/session-start.mjs codex
@@ -288,6 +313,12 @@ Each client writes these files inside the runtime directory:
 
 ## Dashboard Reopen Helper
 
+> **Note:** the Lattice sidecar launcher (`serena/start-http.mjs`) starts
+> Serena with `--enable-web-dashboard false --open-web-dashboard false`, so a
+> sidecar it started normally logs no dashboard URL and this helper exits 1
+> with "No dashboard URL was found". The helper is only useful for a Serena
+> process launched with the web dashboard enabled.
+
 The Serena dashboard is ephemeral and tied to the server lifecycle. Use the
 helper to reopen it on demand:
 
@@ -323,8 +354,8 @@ matching launcher first.
 Serena setup is **complete** when ALL of these pass:
 
 1. `uvx --version` exits 0
-2. `echo '{}' | node hooks/session-start.mjs <client>` exits 0 and stderr mentions "ready" or "already listening"
-3. `curl -sf http://127.0.0.1:<port>/mcp -o /dev/null` exits 0
+2. Per-client sidecar path only: `echo '{}' | node hooks/session-start.mjs <client>` exits 0 and stderr mentions "ready" or "already listening". On the 9127 singleton path (`LATTICE_DISABLE=serena`) the hook starts no Serena process, so skip this item.
+3. `curl -sf http://127.0.0.1:<port>/mcp -o /dev/null` exits 0, where `<port>` is the port your MCP config points at (`9127` for the singleton; `9121`/`9122`/`9123` for the Copilot/Claude/Codex sidecars)
 4. The MCP config file for your client exists and points to the correct endpoint
    - Claude Code: `.mcp.json`
    - GitHub Copilot CLI: your environment-specific Copilot MCP config
@@ -393,8 +424,9 @@ tail -20 ~/.local/state/<consumer-repo>/serena/<client>.log
 ```bash
 # The dashboard URL is extracted from the Serena log. If it is not there:
 node hooks/serena/open-dashboard.mjs <client>
-# => If this prints "no dashboard URL", Serena may not have emitted it yet.
-# Wait a few seconds and retry, or check the log directly:
+# => If this prints "No dashboard URL was found", the Lattice sidecar most
+# likely started Serena with --enable-web-dashboard false (its default), so
+# no URL is ever logged. Check the log directly:
 grep -i dashboard ~/.local/state/<consumer-repo>/serena/<client>.log
 ```
 
